@@ -308,6 +308,7 @@ function initTestimonials() {
         ? 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(meta.googlePlaceId)
         : null,
       BBB: meta.bbbProfileUrl || null,
+      Facebook: meta.facebookPageUrl || null,
     };
 
     function escapeHtml(s) {
