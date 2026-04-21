@@ -288,10 +288,10 @@ function initTestimonials() {
 
   fetch('data/reviews.json', { cache: 'no-store' })
     .then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
-    .then(function(data) { renderTestimonials(data.reviews || []); })
+    .then(function(data) { renderTestimonials(data.reviews || [], data._meta || {}); })
     .catch(function() { carousel.style.display = 'none'; });
 
-  function renderTestimonials(reviews) {
+  function renderTestimonials(reviews, meta) {
     const sorted = reviews.slice().sort(function(a, b) {
       const ta = a.timestamp ? Date.parse(a.timestamp) : 0;
       const tb = b.timestamp ? Date.parse(b.timestamp) : 0;
@@ -302,10 +302,33 @@ function initTestimonials() {
     const pages = Math.max(1, Math.ceil(sorted.length / perPage));
     let page = 0;
 
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const googleReviewsUrl = meta.googlePlaceId
+      ? 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(meta.googlePlaceId)
+      : null;
+
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, function(c) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
       });
+    }
+
+    function formatMonthYear(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      return MONTHS[d.getUTCMonth()] + ' ' + d.getUTCFullYear();
+    }
+
+    function sourceLineHtml(r) {
+      const source = r.source || '';
+      const date = formatMonthYear(r.timestamp);
+      const label = date ? escapeHtml(source) + ' &middot; ' + date : escapeHtml(source);
+      if (source === 'Google' && googleReviewsUrl) {
+        return '<a class="testimonial-card__source-link" href="' + googleReviewsUrl +
+               '" target="_blank" rel="noopener">' + label + '</a>';
+      }
+      return label;
     }
 
     function cardHtml(r) {
@@ -315,7 +338,7 @@ function initTestimonials() {
           '<div class="testimonial-card__stars">' + stars + '</div>' +
           '<p class="testimonial-card__quote">&ldquo;' + escapeHtml(r.text || '') + '&rdquo;</p>' +
           '<p class="testimonial-card__author">' + escapeHtml(r.displayName || '') + '</p>' +
-          '<p class="testimonial-card__location">' + escapeHtml(r.source || '') + '</p>' +
+          '<p class="testimonial-card__location">' + sourceLineHtml(r) + '</p>' +
         '</div>'
       );
     }
