@@ -1,6 +1,70 @@
 {
   "reviews": [
     {
+      "id": "google-Ci9DQUlRQUNvZENodHljRjlvT2pOeWJWUnFjRkZ1WkhWSVVVbHBlRXBCWkZkaWMxRRAB",
+      "source": "Google",
+      "displayName": "Justine W.",
+      "fullName": "Justine Wahlstrom",
+      "rating": 5,
+      "text": "It is so refreshing to have a company you can depend upon.  Pine Point came on time, removed a very scary tree without incident, and cleaned up like the job never happened.  I will be using them again for future tree issues.",
+      "timestamp": "2025-11-04T12:24:43.859870822Z",
+      "_googleReviewName": "places/ChIJ0yKsPnZDwaERbTBdxkOul_0/reviews/Ci9DQUlRQUNvZENodHljRjlvT2pOeWJWUnFjRkZ1WkhWSVVVbHBlRXBCWkZkaWMxRRAB",
+      "_authorUri": "https://www.google.com/maps/contrib/112411795451418687377/reviews"
+    },
+    {
+      "id": "google-Ci9DQUlRQUNvZENodHljRjlvT2xKS00xVkxaRUZMV21GUVVsTllXWEZGTms5RExVRRAB",
+      "source": "Google",
+      "displayName": "jordan e.",
+      "fullName": "jordan elqasem",
+      "rating": 5,
+      "text": "My experience with Pine Point was fantastic! They did an excellent job removing a large tree for me. They were very professional, and did a fantastic job. Highly recommend their services!",
+      "timestamp": "2025-08-10T12:36:06.480881404Z",
+      "_googleReviewName": "places/ChIJ0yKsPnZDwaERbTBdxkOul_0/reviews/Ci9DQUlRQUNvZENodHljRjlvT2xKS00xVkxaRUZMV21GUVVsTllXWEZGTms5RExVRRAB",
+      "_authorUri": "https://www.google.com/maps/contrib/100158665040644114670/reviews"
+    },
+    {
+      "id": "google-Ci9DQUlRQUNvZENodHljRjlvT2xrelREUTRkR3B2VVdsTWVYaE1NVU4zYVRsSmJGRRAB",
+      "source": "Google",
+      "displayName": "Brendan H.",
+      "fullName": "Brendan Harvey",
+      "rating": 5,
+      "text": "Jason and his crew from Pine Point Tree Service came out to Shrewsbury to remove a huge tree from my front lawn, which had roots disturbing my driveway and also growing under my front porch. They took the tree down very quickly, cleaned up really well after their work was complete, and they were extremely kind to my 4 year old who served as his audience through our front windows for most of the day! I would recommend these guys to all of my friends, family, and neighbors. And also to some strangers out there searching the internet for someone to do some tree work.",
+      "timestamp": "2025-07-22T02:05:13.611766159Z",
+      "_googleReviewName": "places/ChIJ0yKsPnZDwaERbTBdxkOul_0/reviews/Ci9DQUlRQUNvZENodHljRjlvT2xrelREUTRkR3B2VVdsTWVYaE1NVU4zYVRsSmJGRRAB",
+      "_authorUri": "https://www.google.com/maps/contrib/112947109672291409434/reviews"
+    },
+    {
+      "id": "google-Ci9DQUlRQUNvZENodHljRjlvT25WdFVHRm9WbFUwTjFCV2VqQlZjM3BPVFdGNFNtYxAB",
+      "source": "Google",
+      "displayName": "sonia r.",
+      "fullName": "sonia radzik",
+      "rating": 5,
+      "text": "The Pine Point Tree Service crew is prompt, professional and knowledgeable.  They handle everything from tree trimming to clean up with great care and efficiency.  Highly recommend their services to anyone looking for reliable tree care.",
+      "timestamp": "2025-07-21T13:51:26.580687252Z",
+      "_googleReviewName": "places/ChIJ0yKsPnZDwaERbTBdxkOul_0/reviews/Ci9DQUlRQUNvZENodHljRjlvT25WdFVHRm9WbFUwTjFCV2VqQlZjM3BPVFdGNFNtYxAB",
+      "_authorUri": "https://www.google.com/maps/contrib/113110188505544477389/reviews"
+    },
+    {
+      "id": "google-ChZDSUhNMG9nS0VLM1g0YnpUbWRpLU53EAE",
+      "source": "Google",
+      "displayName": "R l.",
+      "fullName": "R lavallee",
+      "rating": 5,
+      "text": "These guys are awesome!!! I had a big old tree with a few limbs i was afraid were going to come through the kitchen window one day. A friend of mine told me to use pine point. Jason came by and gave me a quote the day after I called them. I got home from work and the tree was gone and the place looked like no body had been there! Im thrilled and if i need more work done in the future im calling them first.",
+      "timestamp": "2025-06-02T13:05:30.017406Z",
+      "_googleReviewName": "places/ChIJ0yKsPnZDwaERbTBdxkOul_0/reviews/ChZDSUhNMG9nS0VLM1g0YnpUbWRpLU53EAE",
+      "_authorUri": "https://www.google.com/maps/contrib/100852626968232761672/reviews"
+    },
+    {
+      "id": "bbb-isaac-h-2025-05-22",
+      "source": "BBB",
+      "displayName": "Isaac H.",
+      "fullName": "Isaac H.",
+      "rating": 5,
+      "text": "Pine Point Tree Service did a great job taking down three large trees in my yard. They were very careful with my other plants, did a great job cleaning up, and the pricing was very fair. They were punctual and great with communication from start to finish. Would definitely recommend them.",
+      "timestamp": "2025-05-22T00:00:00Z"
+    },
+    {
       "id": "facebook-susan-bergman",
       "source": "Facebook",
       "displayName": "Susan B.",
@@ -17,21 +81,13 @@
       "rating": 5,
       "text": "Had Pine Point Tree Service take down a HUGE maple tree in the yard near a deck, pool, and fence. Awesome job!!! Couldn't be happier!!",
       "timestamp": null
-    },
-    {
-      "id": "bbb-isaac-h-2025-05-22",
-      "source": "BBB",
-      "displayName": "Isaac H.",
-      "fullName": "Isaac H.",
-      "rating": 5,
-      "text": "Pine Point Tree Service did a great job taking down three large trees in my yard. They were very careful with my other plants, did a great job cleaning up, and the pricing was very fair. They were punctual and great with communication from start to finish. Would definitely recommend them.",
-      "timestamp": "2025-05-22T00:00:00Z"
     }
   ],
   "_meta": {
-    "lastSyncedAt": null,
-    "googlePlaceId": null,
-    "googleMapsUrl": "https://share.google/EMgSfn4kHaD906vzc"
+    "lastSyncedAt": "2026-04-21T15:57:26.632Z",
+    "googlePlaceId": "ChIJ0yKsPnZDwaERbTBdxkOul_0",
+    "googleMapsUrl": "https://share.google/EMgSfn4kHaD906vzc",
+    "googleBusinessName": "Pine Point Tree Service"
   },
   "_notes": {
     "displayRule": "First name + last initial only on public site",
