@@ -13,13 +13,21 @@ Secrets page: https://github.com/fitFo-Systems/pinepointtrees/settings/secrets/a
 
 ### 1a. Create a Google Cloud project
 
+One GCP project per client, named after the client. It becomes the bucket for
+everything Pine Point-specific — reviews API today, whatever data work comes
+later (analytics, integrations, BI) tomorrow. Cross-client analytics will
+eventually live in a separate `FitFo Analytics` project; don't build that
+until there's a second client.
+
 1. https://console.cloud.google.com/projectcreate
-2. Name: `fitfo-pinepoint-reviews`. Organization: none. Create.
+2. **Project name:** `Pine Point Tree Service`. GCP will auto-suggest an ID
+   like `pine-point-tree-service-xxxxx` — accept it (the ID is immutable and
+   only shows up in API plumbing). **Organization:** FitFo Systems. Create.
 
 ### 1b. Enable the Places API (New)
 
 1. https://console.cloud.google.com/apis/library/places.googleapis.com
-2. Make sure the project picker (top bar) shows `fitfo-pinepoint-reviews`.
+2. Make sure the project picker (top bar) shows `Pine Point Tree Service`.
 3. Click **Enable**.
 
 ### 1c. Create an API key
