@@ -1,0 +1,47 @@
+name: Deploy to GoDaddy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+  # Run after sync-reviews succeeds. Commits made with GITHUB_TOKEN don't
+  # fire push triggers, so we chain explicitly.
+  workflow_run:
+    workflows: ["Sync Google Reviews"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: godaddy-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # For workflow_run triggers: only deploy if the upstream run succeeded.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: FTP deploy to GoDaddy
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          # Repo-relative source. Only ship what the site needs.
+          local-dir: ./
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/.claude/**
+            **/scripts/**
+            **/docs/**
+            **/versions/**
+            **/import_images/**
+            **/video/**
+            **/README.md
+            **/V0.2-BUILD-SUMMARY.md
+            **/.DS_Store

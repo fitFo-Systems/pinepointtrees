@@ -1,35 +1,41 @@
 {
   "reviews": [
     {
+      "id": "facebook-susan-bergman",
+      "source": "Facebook",
       "displayName": "Susan B.",
       "fullName": "Susan Bergman",
       "rating": 5,
-      "publicSource": "Facebook",
-      "actualSource": "Facebook (Pine Point Tree Service page)",
       "text": "Pine Point did an excellent job grooming our big oaks and trimming back the brush. They cleaned up all the branches and swept the driveway.",
-      "date": null
+      "timestamp": null
     },
     {
+      "id": "facebook-roger-rheaume",
+      "source": "Facebook",
       "displayName": "Roger R.",
       "fullName": "Roger Rheaume",
       "rating": 5,
-      "publicSource": "Facebook",
-      "actualSource": "People of Leicester MA (Facebook group)",
       "text": "Had Pine Point Tree Service take down a HUGE maple tree in the yard near a deck, pool, and fence. Awesome job!!! Couldn't be happier!!",
-      "date": null
+      "timestamp": null
     },
     {
+      "id": "bbb-isaac-h-2025-05-22",
+      "source": "BBB",
       "displayName": "Isaac H.",
       "fullName": "Isaac H.",
       "rating": 5,
-      "publicSource": "BBB",
-      "actualSource": "BBB (Better Business Bureau) - posted 05/22/2025",
       "text": "Pine Point Tree Service did a great job taking down three large trees in my yard. They were very careful with my other plants, did a great job cleaning up, and the pricing was very fair. They were punctual and great with communication from start to finish. Would definitely recommend them.",
-      "date": "2025-05-22"
+      "timestamp": "2025-05-22T00:00:00Z"
     }
   ],
+  "_meta": {
+    "lastSyncedAt": null,
+    "googlePlaceId": null,
+    "googleMapsUrl": "https://share.google/EMgSfn4kHaD906vzc"
+  },
   "_notes": {
     "displayRule": "First name + last initial only on public site",
-    "sourceRule": "Use only generic labels: Google, Facebook, BBB. Do not mention specific Facebook group names."
+    "sourceRule": "Use only generic labels: Google, Facebook, BBB. Do not mention specific Facebook group names.",
+    "dedupeRule": "Unique by `id`. Google reviews use review_id from Places API; manual entries use a descriptive slug."
   }
 }
