@@ -1,0 +1,39 @@
+name: Sync Google Reviews
+
+on:
+  schedule:
+    # Every Monday at 09:00 UTC (~05:00 ET). Weekly cadence is plenty for a
+    # local service with low review volume.
+    - cron: "0 9 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Sync reviews from Google Places API
+        env:
+          GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+          GOOGLE_PLACE_ID: ${{ secrets.GOOGLE_PLACE_ID }}
+        run: node scripts/sync-google-reviews.mjs
+
+      - name: Commit changes (if any)
+        run: |
+          if [[ -z "$(git status --porcelain data/reviews.json)" ]]; then
+            echo "No changes."
+            exit 0
+          fi
+          git config user.name "fitfo-reviews-bot"
+          git config user.email "reviews-bot@fitfosystems.com"
+          git add data/reviews.json
+          git commit -m "chore(reviews): sync Google reviews $(date -u +%Y-%m-%d)"
+          git push

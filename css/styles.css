@@ -743,6 +743,48 @@ h3 { font-size: var(--font-size-xl); }
   text-align: center;
 }
 
+.testimonials-carousel {
+  position: relative;
+}
+
+.testimonials-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.testimonials-nav__btn {
+  background: transparent;
+  color: var(--color-white);
+  border: 1px solid var(--color-dark-gray);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.testimonials-nav__btn:hover:not(:disabled) {
+  background: var(--color-dark-gray);
+  border-color: var(--color-medium-gray);
+}
+
+.testimonials-nav__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.testimonials-nav__counter {
+  color: var(--color-medium-gray);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  text-align: center;
+}
+
 .testimonial-card {
   background: var(--color-white);
   padding: 32px;

@@ -344,24 +344,12 @@
         <span class="section-label" style="color: var(--color-green);">Reviews</span>
         <h2>What Our Customers Say</h2>
       </div>
-      <div class="testimonials-grid">
-        <div class="testimonial-card">
-          <div class="testimonial-card__stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-          <p class="testimonial-card__quote">"Pine Point did an excellent job grooming our big oaks and trimming back the brush. They cleaned up all the branches and swept the driveway."</p>
-          <p class="testimonial-card__author">Susan B.</p>
-          <p class="testimonial-card__location">Facebook</p>
-        </div>
-        <div class="testimonial-card">
-          <div class="testimonial-card__stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-          <p class="testimonial-card__quote">"Had Pine Point Tree Service take down a HUGE maple tree in the yard near a deck, pool, and fence. Awesome job!!! Couldn't be happier!!"</p>
-          <p class="testimonial-card__author">Roger R.</p>
-          <p class="testimonial-card__location">Facebook</p>
-        </div>
-        <div class="testimonial-card">
-          <div class="testimonial-card__stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
-          <p class="testimonial-card__quote">"Did a great job taking down three large trees in my yard. Very careful with my other plants, great job cleaning up, and the pricing was very fair. Punctual and great communication from start to finish."</p>
-          <p class="testimonial-card__author">Isaac H.</p>
-          <p class="testimonial-card__location">BBB</p>
+      <div class="testimonials-carousel" id="testimonialsCarousel" data-reviews-container>
+        <div class="testimonials-grid" id="testimonialsGrid" aria-live="polite"></div>
+        <div class="testimonials-nav">
+          <button class="testimonials-nav__btn testimonials-nav__btn--prev" aria-label="Previous reviews">&#9664;</button>
+          <span class="testimonials-nav__counter" id="testimonialsCounter">1 / 1</span>
+          <button class="testimonials-nav__btn testimonials-nav__btn--next" aria-label="Next reviews">&#9654;</button>
         </div>
       </div>
       <div class="reviews-cta">
