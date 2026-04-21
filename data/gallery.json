@@ -1,0 +1,10 @@
+{
+  "photos": [
+    { "src": "images/equipment1.jpg", "alt": "Bucket truck working on property" },
+    { "src": "images/equipment2.jpg", "alt": "Bucket truck with boom extended" },
+    { "src": "images/transformation1d.jpg", "alt": "Lot clearing progress" },
+    { "src": "images/after4.jpg", "alt": "Clean yard after pine tree removal" },
+    { "src": "images/transformation1a.jpg", "alt": "Equipment arriving on site" },
+    { "src": "images/after1.jpg", "alt": "Property cleared and clean" }
+  ]
+}

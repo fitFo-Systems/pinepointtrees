@@ -1,0 +1,33 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Build artifacts / deps
+node_modules/
+dist/
+build/
+
+# Point-in-time snapshots — history lives in git now
+versions/
+
+# Raw video originals (web-optimized versions ship in images/)
+video/*.mov
+video/*.MOV
+video/*.mp4
+
+# Claude local settings (keep launch.json shared)
+.claude/settings.local.json
