@@ -303,9 +303,12 @@ function initTestimonials() {
     let page = 0;
 
     const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    const googleReviewsUrl = meta.googlePlaceId
-      ? 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(meta.googlePlaceId)
-      : null;
+    const sourceUrls = {
+      Google: meta.googlePlaceId
+        ? 'https://www.google.com/maps/place/?q=place_id:' + encodeURIComponent(meta.googlePlaceId)
+        : null,
+      BBB: meta.bbbProfileUrl || null,
+    };
 
     function escapeHtml(s) {
       return String(s).replace(/[&<>"']/g, function(c) {
@@ -324,8 +327,9 @@ function initTestimonials() {
       const source = r.source || '';
       const date = formatMonthYear(r.timestamp);
       const label = date ? escapeHtml(source) + ' &middot; ' + date : escapeHtml(source);
-      if (source === 'Google' && googleReviewsUrl) {
-        return '<a class="testimonial-card__source-link" href="' + googleReviewsUrl +
+      const url = sourceUrls[source];
+      if (url) {
+        return '<a class="testimonial-card__source-link" href="' + url +
                '" target="_blank" rel="noopener">' + label + '</a>';
       }
       return label;
