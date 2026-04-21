@@ -75,7 +75,7 @@
     },
     {
       "id": "facebook-roger-rheaume",
-      "source": "Facebook",
+      "source": "Facebook Group",
       "displayName": "Roger R.",
       "fullName": "Roger Rheaume",
       "rating": 5,
@@ -87,11 +87,13 @@
     "lastSyncedAt": "2026-04-21T15:57:26.632Z",
     "googlePlaceId": "ChIJ0yKsPnZDwaERbTBdxkOul_0",
     "googleMapsUrl": "https://share.google/EMgSfn4kHaD906vzc",
-    "googleBusinessName": "Pine Point Tree Service"
+    "googleBusinessName": "Pine Point Tree Service",
+    "bbbProfileUrl": "https://www.bbb.org/us/ma/leicester/profile/tree-service/pine-point-tree-service-llc-0261-352040",
+    "facebookPageUrl": "https://www.facebook.com/p/Pine-Point-Tree-Service-61558639977799/"
   },
   "_notes": {
     "displayRule": "First name + last initial only on public site",
-    "sourceRule": "Use only generic labels: Google, Facebook, BBB. Do not mention specific Facebook group names.",
+    "sourceRule": "Allowed source labels: Google, Facebook (PPTS page), Facebook Group (community group post), BBB. Links (when present in _meta) are applied by source label via the renderer's sourceUrls map.",
     "dedupeRule": "Unique by `id`. Google reviews use review_id from Places API; manual entries use a descriptive slug."
   }
 }
