@@ -4,11 +4,17 @@
    branching logic and targeted pricing.
    ============================================= */
 
+// Lead capture endpoint — Google Apps Script Web App URL.
+// Empty string = leads logged to console only (dev mode). Replace after deploy:
+// docs/LEAD-CAPTURE-SETUP.md
+const APPS_SCRIPT_URL = '';
+
 // --- State ---
 const state = {
   service: null,
   answers: {},
   contact: {},
+  price: null,
   history: ['service'],  // step navigation history for back button
   currentStep: 'service'
 };
@@ -307,18 +313,61 @@ function submitContact(e) {
     phone: document.getElementById('contact-phone').value,
     email: document.getElementById('contact-email').value,
     town:  document.getElementById('contact-town').value,
+    notes: document.getElementById('contact-notes').value,
   };
-  // Calculate estimate and show result
+  state.price = calculateEstimate();
+
+  postLead({
+    formType: 'estimate_contact',
+    service: state.service,
+    answers: state.answers,
+    price: state.price,
+    contact: state.contact,
+    page: location.href
+  });
+
   showResult();
   goToStep('result');
-  // In production: POST contact info + estimate data to Google Apps Script
 }
 
 function submitSchedule(e) {
   e.preventDefault();
-  // In production: POST to Google Apps Script with estimate context + contact info
+  const sched = {
+    name:  document.getElementById('sched-name').value,
+    phone: document.getElementById('sched-phone').value,
+    email: document.getElementById('sched-email').value,
+    time:  document.getElementById('sched-time').value,
+    notes: document.getElementById('sched-notes').value,
+  };
+
+  postLead({
+    formType: 'schedule',
+    service: state.service,
+    answers: state.answers,
+    price: state.price || calculateEstimate(),
+    contact: { name: sched.name, phone: sched.phone, email: sched.email },
+    scheduledTime: sched.time,
+    scheduleNotes: sched.notes,
+    page: location.href
+  });
+
   document.getElementById('scheduleForm').style.display = 'none';
   document.getElementById('scheduleConfirmation').style.display = 'block';
+}
+
+// Fire-and-forget POST to the Apps Script endpoint. Never blocks the UX —
+// the user always sees the success state, even if the network request fails.
+function postLead(payload) {
+  if (!APPS_SCRIPT_URL) {
+    console.log('[lead] APPS_SCRIPT_URL not set, would have sent:', payload);
+    return;
+  }
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).catch(err => console.warn('[lead] post failed', err));
 }
 
 // Close modal on overlay click
