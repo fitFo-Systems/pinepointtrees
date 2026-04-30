@@ -7,7 +7,7 @@
 // Lead capture endpoint — Google Apps Script Web App URL.
 // Empty string = leads logged to console only (dev mode). Replace after deploy:
 // docs/LEAD-CAPTURE-SETUP.md
-const APPS_SCRIPT_URL = '';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz68dVyIGyruTPSofHei6UqcbkBuDZKhGybFLFjcowc2uCSIkDol4NWOJ0FOZdqlxOXpQ/exec';
 
 // --- State ---
 const state = {
