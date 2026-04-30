@@ -8,6 +8,7 @@
 const state = {
   service: null,
   answers: {},
+  contact: {},
   history: ['service'],  // step navigation history for back button
   currentStep: 'service'
 };
@@ -285,6 +286,11 @@ function submitCarving(e) {
 
 // --- Schedule Follow-Up Modal ---
 function openScheduleModal() {
+  const c = state.contact || {};
+  const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
+  set('sched-name', c.name);
+  set('sched-phone', c.phone);
+  set('sched-email', c.email);
   document.getElementById('scheduleModal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
 }
@@ -296,6 +302,12 @@ function closeScheduleModal() {
 
 function submitContact(e) {
   e.preventDefault();
+  state.contact = {
+    name:  document.getElementById('contact-name').value,
+    phone: document.getElementById('contact-phone').value,
+    email: document.getElementById('contact-email').value,
+    town:  document.getElementById('contact-town').value,
+  };
   // Calculate estimate and show result
   showResult();
   goToStep('result');

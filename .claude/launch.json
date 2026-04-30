@@ -4,7 +4,7 @@
     {
       "name": "pinepoint-site",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["http-server", "/Users/keithcreelman/Documents/FITFO/project3_PinepointTrees", "-p", "8080", "-c-1"],
+      "runtimeArgs": ["http-server", "/Users/keithcreelman/Desktop/project3_PinepointTrees", "-p", "8080", "-c-1"],
       "port": 8080
     }
   ]
