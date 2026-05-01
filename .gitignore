@@ -31,3 +31,7 @@ video/*.mp4
 
 # Claude local settings (keep launch.json shared)
 .claude/settings.local.json
+
+# Internal handoff page — never ship to the customer-facing site.
+# This page is intended for fitFo-owned hosting (e.g. previews.fitfosystems.com).
+/handoff/

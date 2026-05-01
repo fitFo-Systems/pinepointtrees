@@ -60,7 +60,8 @@ const SHEETS = {
   },
   pending: {
     name: '_Pending Lead Emails',
-    headers: ['Queued At', 'Phone Key', 'Email Key', 'Payload JSON']
+    headers: ['Queued At', 'Phone Key', 'Email Key', 'Payload JSON'],
+    hidden: true  // internal queue used by the script — not for Jason to look at
   }
 };
 
@@ -167,6 +168,11 @@ function doPost(e) {
         }
       }
       writeSchedule(ss, data);
+      // Once they've scheduled a callback they're no longer a "lead awaiting
+      // follow-up" — remove them from the Estimate Leads tab so that tab
+      // really means "open leads to call." Full detail lives in Schedule
+      // Requests + the All Leads summary.
+      removeEstimateRow(ss, data.estimateNumber);
       upsertSummary(ss, data, 'Callback');
       sendCallbackEmail(data);
     } else {
@@ -196,6 +202,26 @@ function nextEstimateNumber() {
     return yyyy + '_' + String(next).padStart(5, '0');
   } finally {
     lock.releaseLock();
+  }
+}
+
+/**
+ * Removes any Estimate Leads rows matching the given Estimate #. Called
+ * after a schedule submission so a customer doesn't appear in both the
+ * Estimate Leads and Schedule Requests tabs simultaneously — they've
+ * upgraded from "lead" to "callback" and only belong in one place.
+ */
+function removeEstimateRow(ss, estimateNumber) {
+  if (!estimateNumber) return;
+  const sheet = ss.getSheetByName(SHEETS.estimate_contact.name);
+  if (!sheet) return;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (let i = ids.length - 1; i >= 0; i--) {
+    if (ids[i][0] === estimateNumber) {
+      sheet.deleteRow(i + 2);
+    }
   }
 }
 
@@ -509,13 +535,16 @@ function collectRecentScheduleKeys(ss, minutesBack) {
   if (lastRow < 2) return keys;
 
   const cutoff = new Date(Date.now() - minutesBack * 60 * 1000);
-  // Schedule columns: 1=Timestamp, 3=Phone, 4=Email
-  const rows = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  // Schedule Requests columns: 1=Estimate#, 2=Timestamp, 3=Name, 4=Phone, 5=Email
+  // (Was 4-col read at 1=Timestamp, 3=Phone, 4=Email before Estimate # was
+  //  added as col 1 — that staleness caused a stray Bobo lead email to fire
+  //  even after the callback was confirmed.)
+  const rows = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
   for (const r of rows) {
-    const ts = new Date(r[0]);
-    if (ts < cutoff) continue;
-    const pk = normalizeKey(r[2]);
-    const ek = normalizeKey(r[3]);
+    const ts = r[1] instanceof Date ? r[1] : new Date(r[1]);
+    if (!isNaN(ts.getTime()) && ts < cutoff) continue;
+    const pk = normalizeKey(r[3]);
+    const ek = normalizeKey(r[4]);
     if (pk) keys.add(pk);
     if (ek) keys.add(ek);
   }
@@ -856,6 +885,9 @@ function getOrCreate(ss, def) {
     s.appendRow(def.headers);
     s.setFrozenRows(1);
     s.getRange(1, 1, 1, def.headers.length).setFontWeight('bold');
+    if (def.hidden) s.hideSheet();
+  } else if (def.hidden && !s.isSheetHidden()) {
+    s.hideSheet();
   }
   return s;
 }
