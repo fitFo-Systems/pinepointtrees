@@ -30,7 +30,9 @@ const SHEETS = {
   estimate_contact: {
     name: 'Estimate Leads',
     headers: [
-      'Estimate #', 'Timestamp', 'Name', 'Phone', 'Email', 'Town',
+      'Estimate #', 'Timestamp', 'Name', 'Phone', 'Email',
+      'ZIP', 'City (USPS)', 'State', 'Distance (mi)', 'Outside Area',
+      'Town (entered)',
       'Service', 'Tree Count', 'Tree Height', 'Hazards', 'Access',
       'Prune Type', 'Lot Size', 'Lot Density', 'End Goal',
       'Price Low', 'Price Typical', 'Price High',
@@ -40,7 +42,9 @@ const SHEETS = {
   schedule: {
     name: 'Schedule Requests',
     headers: [
-      'Estimate #', 'Timestamp', 'Name', 'Phone', 'Email', 'Best Time',
+      'Estimate #', 'Timestamp', 'Name', 'Phone', 'Email',
+      'ZIP', 'City (USPS)', 'State', 'Distance (mi)', 'Outside Area',
+      'Best Time',
       'Service', 'Details', 'Price Typical', 'Notes', 'Photos', 'Page'
     ]
   },
@@ -49,6 +53,11 @@ const SHEETS = {
     headers: ['Queued At', 'Phone Key', 'Email Key', 'Payload JSON']
   }
 };
+
+// Pine Point's service center (Leicester, MA) and operating radius.
+const SERVICE_CENTER_LAT = 42.2459;
+const SERVICE_CENTER_LNG = -71.9087;
+const SERVICE_RADIUS_MILES = 15;
 
 const PHOTO_FOLDER_NAME = 'Pine Point Lead Photos';
 
@@ -111,6 +120,7 @@ function doPost(e) {
         return jsonResponse({ error: 'invalid contact' });
       }
       data.estimateNumber = nextEstimateNumber();
+      data.areaCheck = checkServiceArea((data.contact || {}).zip);
       data.photoLinks = savePhotosToDrive(data.photos, data.estimateNumber, data.service, (data.contact || {}).name);
       delete data.photos;
       writeEstimate(ss, data);
@@ -119,6 +129,7 @@ function doPost(e) {
       if (!isValidContact(data.contact)) {
         return jsonResponse({ error: 'invalid contact' });
       }
+      data.areaCheck = checkServiceArea((data.contact || {}).zip);
       const cancelled = cancelPendingFor(ss, data);
       // Inherit estimate number from the cancelled pending lead if available,
       // otherwise fall back to the most recent matching Estimate Leads row
@@ -152,11 +163,11 @@ function nextEstimateNumber() {
   lock.waitLock(10000);
   try {
     const props = PropertiesService.getScriptProperties();
-    const yy = String(new Date().getFullYear()).slice(2);
-    const key = 'estimate_counter_' + yy;
+    const yyyy = String(new Date().getFullYear());
+    const key = 'estimate_counter_' + yyyy;
     const next = parseInt(props.getProperty(key) || '0', 10) + 1;
     props.setProperty(key, String(next));
-    return yy + '_' + String(next).padStart(5, '0');
+    return yyyy + '_' + String(next).padStart(5, '0');
   } finally {
     lock.releaseLock();
   }
@@ -192,7 +203,57 @@ function isValidContact(c) {
   if (phoneDigits.length < 7 || phoneDigits.length > 15) return false;
   if (/^(\d)\1+$/.test(phoneDigits)) return false; // all same digit
   if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) return false;
+  if (!/^\d{5}(-\d{4})?$/.test(String(c.zip || '').trim())) return false;
   return true;
+}
+
+/**
+ * Looks up a US ZIP via the free zippopotam.us API to confirm it's a real
+ * USPS ZIP and to compute distance from our service center. Returns:
+ *   { ok: true,  city, state, lat, lng, miles, withinServiceArea }
+ *   { ok: false, reason: 'not_found' | 'http_error' | 'fetch_failed' }
+ *
+ * Failure modes never block the submission — they just leave the
+ * area-check empty in the email/sheet.
+ */
+function checkServiceArea(zip) {
+  if (!zip) return { ok: false, reason: 'no_zip' };
+  const zip5 = String(zip).split('-')[0];
+  if (!/^\d{5}$/.test(zip5)) return { ok: false, reason: 'bad_format' };
+  try {
+    const resp = UrlFetchApp.fetch('https://api.zippopotam.us/us/' + zip5, { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) {
+      return { ok: false, reason: 'not_found', status: resp.getResponseCode() };
+    }
+    const data = JSON.parse(resp.getContentText());
+    const place = data && data.places && data.places[0];
+    if (!place) return { ok: false, reason: 'no_place' };
+    const lat = parseFloat(place.latitude);
+    const lng = parseFloat(place.longitude);
+    const miles = haversineMiles(SERVICE_CENTER_LAT, SERVICE_CENTER_LNG, lat, lng);
+    return {
+      ok: true,
+      city: place['place name'] || '',
+      state: place['state abbreviation'] || '',
+      lat: lat,
+      lng: lng,
+      miles: miles,
+      withinServiceArea: miles <= SERVICE_RADIUS_MILES
+    };
+  } catch (err) {
+    return { ok: false, reason: 'fetch_failed', error: String(err) };
+  }
+}
+
+function haversineMiles(lat1, lng1, lat2, lng2) {
+  const R = 3958.8;
+  const toRad = function (d) { return d * Math.PI / 180; };
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(a));
 }
 
 function doGet() {
@@ -208,10 +269,15 @@ function writeEstimate(ss, d) {
   const a = d.answers || {};
   const c = d.contact || {};
   const p = d.price || {};
+  const ac = d.areaCheck || {};
+  const distance = (ac.ok && typeof ac.miles === 'number') ? Number(ac.miles.toFixed(1)) : '';
+  const outside = ac.ok ? (ac.withinServiceArea ? '' : 'YES') : '';
   sheet.appendRow([
     d.estimateNumber || '',
     new Date(),
-    c.name || '', c.phone || '', c.email || '', c.town || '',
+    c.name || '', c.phone || '', c.email || '',
+    c.zip || '', ac.city || '', ac.state || '', distance, outside,
+    c.town || '',
     d.service || '',
     a.treeCount || '', a.treeHeight || '', a.hazards || '', a.access || '',
     a.pruneType || '', a.lotSize || '', a.lotDensity || '', a.endGoal || '',
@@ -224,10 +290,14 @@ function writeSchedule(ss, d) {
   const sheet = getOrCreate(ss, SHEETS.schedule);
   const c = d.contact || {};
   const p = d.price || {};
+  const ac = d.areaCheck || {};
+  const distance = (ac.ok && typeof ac.miles === 'number') ? Number(ac.miles.toFixed(1)) : '';
+  const outside = ac.ok ? (ac.withinServiceArea ? '' : 'YES') : '';
   sheet.appendRow([
     d.estimateNumber || '',
     new Date(),
     c.name || '', c.phone || '', c.email || '',
+    c.zip || '', ac.city || '', ac.state || '', distance, outside,
     d.scheduledTime || '',
     d.service || '', JSON.stringify(d.answers || {}),
     p.typical || '',
@@ -371,14 +441,10 @@ function sendLeadEmail(d) {
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#222">',
     '<h2 style="margin:0 0 4px;color:#2D5A27">New Lead</h2>',
     num ? '<p style="margin:0 0 4px;font-size:13px;color:#444">Estimate #: <strong>' + escapeHtml(num) + '</strong></p>' : '',
-    '<p style="margin:0 0 20px;color:#666;font-size:13px">' +
+    '<p style="margin:0 0 12px;color:#666;font-size:13px">' +
       'Estimate submitted ' + EMAIL_DELAY_MINUTES + '+ minutes ago, no callback scheduled.</p>',
-    htmlSection('Contact', [
-      ['Name', escapeHtml(c.name || '(none)')],
-      ['Phone', phoneLink(c.phone)],
-      ['Email', emailLink(c.email)],
-      ['Town', escapeHtml(c.town || '(none)')]
-    ]),
+    outsideAreaBanner(d.areaCheck),
+    htmlSection('Contact', contactRows(c, d.areaCheck)),
     htmlSection('Job', [
       ['Service', '<strong>' + escapeHtml(SERVICE_NAMES[d.service] || d.service || '') + '</strong>']
     ].concat(answerRows(d.service, d.answers))),
@@ -406,13 +472,11 @@ function sendCallbackEmail(d) {
   const html = [
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#222">',
     '<h2 style="margin:0 0 4px;color:#2D5A27">Callback Requested</h2>',
-    num ? '<p style="margin:0 0 16px;font-size:13px;color:#444">Estimate #: <strong>' + escapeHtml(num) + '</strong></p>' : '<div style="height:12px"></div>',
-    htmlSection('Caller', [
-      ['Name', escapeHtml(c.name || '(name)')],
-      ['Phone', phoneLink(c.phone)],
-      ['Email', emailLink(c.email)],
+    num ? '<p style="margin:0 0 12px;font-size:13px;color:#444">Estimate #: <strong>' + escapeHtml(num) + '</strong></p>' : '<div style="height:12px"></div>',
+    outsideAreaBanner(d.areaCheck),
+    htmlSection('Caller', contactRows(c, d.areaCheck).concat([
       ['Best time', '<strong>' + escapeHtml(d.scheduledTime || '(any)') + '</strong>']
-    ]),
+    ])),
     htmlSection('Job', [
       ['Service', '<strong>' + escapeHtml(SERVICE_NAMES[d.service] || d.service || '') + '</strong>']
     ].concat(answerRows(d.service, d.answers))),
@@ -425,6 +489,50 @@ function sendCallbackEmail(d) {
   ].join('');
 
   sendHtmlEmail(subject, html, buildAttachments(d.photoLinks));
+}
+
+/**
+ * Builds the standard contact rows used in both lead and callback emails.
+ * Pulls USPS city/state from areaCheck when available so the customer's
+ * actual location is visible at a glance, with the typed town as a fallback.
+ */
+function contactRows(c, areaCheck) {
+  c = c || {};
+  const usps = areaCheck && areaCheck.ok ? areaCheck : null;
+  const cityState = usps ? (usps.city + ', ' + usps.state) : '';
+  const zip = c.zip || '';
+  const zipLine = zip + (cityState ? ' (' + cityState + ')' : '');
+  const town = c.town || '';
+  const rows = [
+    ['Name', escapeHtml(c.name || '(none)')],
+    ['Phone', phoneLink(c.phone)],
+    ['Email', emailLink(c.email)],
+    ['ZIP', escapeHtml(zipLine || '(none)')]
+  ];
+  if (town) rows.push(['Town', escapeHtml(town) + ' <span style="color:#888;font-size:12px">(as entered)</span>']);
+  if (usps && typeof usps.miles === 'number') {
+    rows.push(['Distance', escapeHtml(usps.miles.toFixed(1) + ' mi from Leicester')]);
+  }
+  return rows;
+}
+
+/**
+ * Returns an HTML banner if the submission's ZIP geocoded outside our
+ * service radius. Empty string if the area check passed or never ran.
+ * The customer never sees this — it's an internal flag to be discussed
+ * with Jason before deciding policy.
+ */
+function outsideAreaBanner(areaCheck) {
+  if (!areaCheck || !areaCheck.ok) return '';
+  if (areaCheck.withinServiceArea) return '';
+  const miles = (areaCheck.miles || 0).toFixed(1);
+  return [
+    '<div style="margin:0 0 16px;padding:10px 14px;background:#fff5e6;border:1px solid #c85a28;border-radius:4px;color:#5a2c0d;font-size:14px">',
+    '<strong>⚠ Outside service area:</strong> ',
+    escapeHtml(miles), ' mi from Leicester ',
+    '(service radius is ', String(SERVICE_RADIUS_MILES), ' mi).',
+    '</div>'
+  ].join('');
 }
 
 function htmlSection(title, rows) {
@@ -549,18 +657,21 @@ function normalizeKey(s) {
  * Folder structure:
  *   Pine Point Lead Photos/
  *     May_26/
- *       26_00001_Removal_JohnSmith/
+ *       MAY26_Removal_JohnSmith_2026_00001/
  *         originalfilename.jpg
  *
- * The estimate number prefix on the per-estimate folder makes the folder
- * name unique even if the same customer submits twice in the same month.
+ * The estimate-number suffix on the per-estimate folder keeps the name
+ * unique even if the same customer submits twice in the same month.
  */
 function savePhotosToDrive(photos, estimateNumber, service, customerName) {
   if (!photos || !photos.length) return [];
-  const monthYear = formatMonthYear(new Date());
+  const now = new Date();
+  const monthYear = formatMonthYear(now);             // "May_26"   — parent folder
+  const monthYearUpper = formatMonthYearUpper(now);   // "MAY26"    — folder name prefix
   const safeService = SERVICE_SHORT[service] || 'Other';
   const safeName = sanitizeName(customerName) || 'Anonymous';
-  const folderName = (estimateNumber || 'NoNum') + '_' + safeService + '_' + safeName;
+  const folderName = monthYearUpper + '_' + safeService + '_' + safeName +
+                     (estimateNumber ? '_' + estimateNumber : '');
 
   const root = getOrCreatePhotoFolder();
   const monthFolder = getOrCreateChildFolder(root, monthYear);
@@ -589,6 +700,11 @@ function savePhotosToDrive(photos, estimateNumber, service, customerName) {
 function formatMonthYear(d) {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return months[d.getMonth()] + '_' + String(d.getFullYear()).slice(2);
+}
+
+function formatMonthYearUpper(d) {
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  return months[d.getMonth()] + String(d.getFullYear()).slice(2);
 }
 
 function sanitizeName(s) {

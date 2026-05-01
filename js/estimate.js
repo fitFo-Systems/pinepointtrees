@@ -170,6 +170,12 @@ function isValidEmail(s) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
 
+// Format-only check; the server fetches USPS-backed validity (zippopotam.us)
+// and decides if it's inside the service area.
+function isValidZip(s) {
+  return /^\d{5}(-\d{4})?$/.test(String(s || '').trim());
+}
+
 function flagInvalid(input, message) {
   if (!input) return;
   input.setCustomValidity(message);
@@ -409,10 +415,11 @@ function submitContact(e) {
   const nameInput  = document.getElementById('contact-name');
   const phoneInput = document.getElementById('contact-phone');
   const emailInput = document.getElementById('contact-email');
+  const zipInput   = document.getElementById('contact-zip');
   const townInput  = document.getElementById('contact-town');
   const notesInput = document.getElementById('contact-notes');
 
-  // Validate phone + email before doing anything else.
+  // Validate phone, email, and ZIP before doing anything else.
   if (!isValidPhone(phoneInput.value)) {
     flagInvalid(phoneInput, 'Please enter a valid phone number we can call you back on.');
     return;
@@ -425,6 +432,12 @@ function submitContact(e) {
   }
   clearInvalid(emailInput);
 
+  if (!isValidZip(zipInput.value)) {
+    flagInvalid(zipInput, 'Please enter a valid 5-digit ZIP code.');
+    return;
+  }
+  clearInvalid(zipInput);
+
   if (photosTotalBytes() > MAX_PHOTOS_TOTAL_BYTES) {
     const status = document.getElementById('photo-status');
     if (status) status.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -435,6 +448,7 @@ function submitContact(e) {
     name:  nameInput.value,
     phone: phoneInput.value,
     email: emailInput.value,
+    zip:   zipInput.value.trim(),
     town:  townInput.value,
     notes: notesInput.value,
   };
