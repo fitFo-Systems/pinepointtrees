@@ -315,7 +315,7 @@ function updateProgress() {
     fill.style.width = '0%';
     return;
   }
-  if (state.currentStep === 'result' || state.currentStep === 'carving') {
+  if (state.currentStep === 'result') {
     fill.style.width = '100%';
     return;
   }
@@ -411,24 +411,6 @@ function calculateEstimate() {
 
 function formatPrice(amount) {
   return '$' + amount.toLocaleString('en-US');
-}
-
-// --- Form Submissions ---
-function submitLead(e) {
-  e.preventDefault();
-  document.getElementById('leadForm').style.display = 'none';
-  document.getElementById('leadConfirmation').style.display = 'block';
-}
-
-function submitCarving(e) {
-  e.preventDefault();
-  const photoInput = document.getElementById('carving-photos');
-  if (photoInput && photoInput.files.length > 6) {
-    alert('Please select up to 6 photos.');
-    return;
-  }
-  document.getElementById('carvingForm').style.display = 'none';
-  document.getElementById('carvingConfirmation').style.display = 'block';
 }
 
 // --- Schedule Follow-Up Modal ---

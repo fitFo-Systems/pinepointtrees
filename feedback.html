@@ -328,8 +328,7 @@
         <div class="section">
           <h2 class="section__title">Services</h2>
           <div class="option-group">
-            <label><input type="checkbox" name="services_accurate" value="yes"> All four services are accurate (removal, trimming, stump grinding, lot clearing)</label>
-            <label><input type="checkbox" name="custom_carving" value="yes"> Keep custom stump carving as a featured service</label>
+            <label><input type="checkbox" name="services_accurate" value="yes"> All three services are accurate (removal, trimming, lot clearing)</label>
           </div>
           <label>Anything to add, remove, or reword? <span class="label-hint">(optional)</span></label>
           <textarea name="services_notes" rows="2" placeholder="Any service we missed, any description that doesn't sound right..."></textarea>
@@ -472,7 +471,6 @@
       strengths: form.strengths?.value || '',
       changes: form.changes?.value || '',
       services_accurate: form.services_accurate?.checked ? 'yes' : '',
-      custom_carving: form.custom_carving?.checked ? 'yes' : '',
       services_notes: form.services_notes?.value || '',
       photos_quality: form.querySelector('input[name="photos_quality"]:checked')?.value || '',
       photos_notes: form.photos_notes?.value || '',

@@ -27,6 +27,17 @@ const EMAIL_DELAY_MINUTES = 5;
 const ATTACHMENT_TOTAL_LIMIT_BYTES = 15 * 1024 * 1024;  // skip attaching once the total exceeds this
 
 const SHEETS = {
+  // Clean, deduplicated view that combines Estimate Leads + Schedule Requests
+  // into one row per Estimate # with just the columns Jason cares about for
+  // follow-up. Each customer = exactly one row, Lead Type updates from
+  // "Lead" → "Callback" when they schedule.
+  summary: {
+    name: 'All Leads',
+    headers: [
+      'Estimate #', 'Name', 'Phone', 'Email', 'ZIP',
+      'Lead Type', 'Job Type', 'Estimate Range'
+    ]
+  },
   estimate_contact: {
     name: 'Estimate Leads',
     headers: [
@@ -124,6 +135,7 @@ function doPost(e) {
       data.photoLinks = savePhotosToDrive(data.photos, data.estimateNumber, data.service, (data.contact || {}).name);
       delete data.photos;
       writeEstimate(ss, data);
+      upsertSummary(ss, data, 'Lead');
       queueLeadEmail(ss, data);
     } else if (data.formType === 'schedule') {
       if (!isValidContact(data.contact, data.formType)) {
@@ -155,6 +167,7 @@ function doPost(e) {
         }
       }
       writeSchedule(ss, data);
+      upsertSummary(ss, data, 'Callback');
       sendCallbackEmail(data);
     } else {
       writeUnknown(ss, data);
@@ -355,6 +368,44 @@ function writeSchedule(ss, d) {
 function writeUnknown(ss, d) {
   const sheet = getOrCreate(ss, { name: 'Other', headers: ['Timestamp', 'Raw'] });
   sheet.appendRow([new Date(), JSON.stringify(d)]);
+}
+
+/**
+ * Maintains the "All Leads" summary tab — one row per Estimate #.
+ * Called with leadType "Lead" on estimate_contact and "Callback" on
+ * schedule. If a row for this Estimate # already exists, updates it in
+ * place (so a Lead row becomes a Callback row when the customer
+ * schedules). Otherwise appends a new row.
+ */
+function upsertSummary(ss, d, leadType) {
+  if (!d.estimateNumber) return;
+  const sheet = getOrCreate(ss, SHEETS.summary);
+  const c = d.contact || {};
+  const p = d.price || {};
+  const range = (p.low && p.high) ? '$' + p.low + '–$' + p.high : '';
+  const jobType = SERVICE_NAMES[d.service] || d.service || '';
+  const row = [
+    d.estimateNumber,
+    c.name || '',
+    c.phone || '',
+    c.email || '',
+    c.zip || '',
+    leadType,
+    jobType,
+    range
+  ];
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow >= 2) {
+    const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (let i = 0; i < ids.length; i++) {
+      if (ids[i][0] === d.estimateNumber) {
+        sheet.getRange(i + 2, 1, 1, row.length).setValues([row]);
+        return;
+      }
+    }
+  }
+  sheet.appendRow(row);
 }
 
 // ============================================================
