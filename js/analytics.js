@@ -12,7 +12,7 @@
  * is safe.
  */
 (function () {
-  var GA_MEASUREMENT_ID = ''; // e.g. 'G-XXXXXXXXXX'
+  var GA_MEASUREMENT_ID = 'G-7J36ZZSDPK';
   if (!GA_MEASUREMENT_ID) return;
 
   var s = document.createElement('script');
