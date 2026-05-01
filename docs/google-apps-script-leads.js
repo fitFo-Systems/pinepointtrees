@@ -28,14 +28,14 @@ const SHEETS = {
       'Service', 'Tree Count', 'Tree Height', 'Hazards', 'Access',
       'Prune Type', 'Lot Size', 'Lot Density', 'End Goal',
       'Price Low', 'Price Typical', 'Price High',
-      'Notes', 'Page'
+      'Notes', 'Photos', 'Page'
     ]
   },
   schedule: {
     name: 'Schedule Requests',
     headers: [
       'Timestamp', 'Name', 'Phone', 'Email', 'Best Time',
-      'Service', 'Details', 'Price Typical', 'Notes', 'Page'
+      'Service', 'Details', 'Price Typical', 'Notes', 'Photos', 'Page'
     ]
   },
   pending: {
@@ -43,6 +43,8 @@ const SHEETS = {
     headers: ['Queued At', 'Phone Key', 'Email Key', 'Payload JSON']
   }
 };
+
+const PHOTO_FOLDER_NAME = 'Pine Point Lead Photos';
 
 const SERVICE_NAMES = {
   removal: 'Tree Removal',
@@ -92,11 +94,22 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
     if (data.formType === 'estimate_contact') {
+      // Save photos first so URLs are available for the sheet row, the
+      // queued payload, and the eventual email. Drop the raw base64 from
+      // the data object before queuing — keeps Properties/sheet payload small.
+      data.photoLinks = savePhotosToDrive(data.photos);
+      delete data.photos;
       writeEstimate(ss, data);
       queueLeadEmail(ss, data);
     } else if (data.formType === 'schedule') {
       writeSchedule(ss, data);
-      cancelPendingFor(ss, data);
+      const cancelled = cancelPendingFor(ss, data);
+      // Carry over photo links from the cancelled lead, if any, so the
+      // callback email has the same context the customer would've gotten
+      // from a delayed lead email.
+      if (cancelled && cancelled.photoLinks && cancelled.photoLinks.length) {
+        data.photoLinks = cancelled.photoLinks;
+      }
       sendCallbackEmail(data);
     } else {
       writeUnknown(ss, data);
@@ -128,7 +141,7 @@ function writeEstimate(ss, d) {
     a.treeCount || '', a.treeHeight || '', a.hazards || '', a.access || '',
     a.pruneType || '', a.lotSize || '', a.lotDensity || '', a.endGoal || '',
     p.low || '', p.typical || '', p.high || '',
-    c.notes || '', d.page || ''
+    c.notes || '', formatPhotoUrls(d.photoLinks), d.page || ''
   ]);
 }
 
@@ -143,6 +156,7 @@ function writeSchedule(ss, d) {
     d.service || '', JSON.stringify(d.answers || {}),
     p.typical || '',
     d.scheduleNotes || '',
+    formatPhotoUrls(d.photoLinks),
     d.page || ''
   ]);
 }
@@ -167,18 +181,25 @@ function queueLeadEmail(ss, d) {
   ]);
 }
 
+/**
+ * Removes pending lead-email rows that match the schedule submission
+ * (by normalized phone or email). Returns the most recently matched
+ * pending payload (parsed) so the caller can carry over any photoLinks
+ * etc. into the callback email; returns null if nothing matched.
+ */
 function cancelPendingFor(ss, d) {
   const sheet = ss.getSheetByName(SHEETS.pending.name);
-  if (!sheet) return;
+  if (!sheet) return null;
   const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return;
+  if (lastRow < 2) return null;
 
   const c = d.contact || {};
   const phoneKey = normalizeKey(c.phone);
   const emailKey = normalizeKey(c.email);
-  if (!phoneKey && !emailKey) return;
+  if (!phoneKey && !emailKey) return null;
 
   const rows = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  let matchedPayload = null;
   // Iterate bottom-up so deleteRow indices stay correct.
   for (let i = rows.length - 1; i >= 0; i--) {
     const pendingPhone = rows[i][1];
@@ -186,9 +207,13 @@ function cancelPendingFor(ss, d) {
     const matchPhone = phoneKey && pendingPhone && phoneKey === pendingPhone;
     const matchEmail = emailKey && pendingEmail && emailKey === pendingEmail;
     if (matchPhone || matchEmail) {
+      if (!matchedPayload) {
+        try { matchedPayload = JSON.parse(rows[i][3]); } catch (e) {}
+      }
       sheet.deleteRow(i + 2);
     }
   }
+  return matchedPayload;
 }
 
 /**
@@ -249,6 +274,7 @@ function sendLeadEmail(d) {
     '  High:    $' + (p.high || '?'),
     '',
     'Their notes: ' + (c.notes || '(none)'),
+    formatPhotosForEmail(d.photoLinks),
     '',
     'Source page: ' + (d.page || '')
   ].join('\n');
@@ -273,7 +299,8 @@ function sendCallbackEmail(d) {
     '',
     'Estimated price (typical): $' + (p.typical || '?'),
     '',
-    'Their note: ' + (d.scheduleNotes || '(none)')
+    'Their note: ' + (d.scheduleNotes || '(none)'),
+    formatPhotosForEmail(d.photoLinks)
   ].join('\n');
   notify(subject, body);
 }
@@ -297,6 +324,58 @@ function humanizeKey(key) {
 
 function normalizeKey(s) {
   return (s || '').toString().toLowerCase().replace(/[^0-9a-z@.]/g, '');
+}
+
+// ============================================================
+// Photo upload to Drive
+// ============================================================
+
+/**
+ * Decodes each base64 data-URL photo from the payload, saves it to the
+ * "Pine Point Lead Photos" Drive folder, and returns an array of
+ * { name, url } so the caller can render them in the email and sheet.
+ */
+function savePhotosToDrive(photos) {
+  if (!photos || !photos.length) return [];
+  const folder = getOrCreatePhotoFolder();
+  const links = [];
+  for (let i = 0; i < photos.length; i++) {
+    const photo = photos[i];
+    try {
+      const match = (photo.dataUrl || '').match(/^data:(.+?);base64,(.*)$/);
+      if (!match) continue;
+      const mimeType = match[1];
+      const base64 = match[2];
+      const filename = (photo.name || 'photo-' + (i + 1)).replace(/[\\/]/g, '_');
+      const blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType, filename);
+      const file = folder.createFile(blob);
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      links.push({ name: filename, url: file.getUrl() });
+    } catch (e) {
+      // Skip individual photo failures rather than losing the whole submission.
+    }
+  }
+  return links;
+}
+
+function getOrCreatePhotoFolder() {
+  const folders = DriveApp.getFoldersByName(PHOTO_FOLDER_NAME);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(PHOTO_FOLDER_NAME);
+}
+
+function formatPhotoUrls(links) {
+  if (!links || !links.length) return '';
+  return links.map(l => l.url).join('\n');
+}
+
+function formatPhotosForEmail(links) {
+  if (!links || !links.length) return '';
+  const lines = ['', 'Photos (' + links.length + '):'];
+  for (const l of links) {
+    lines.push('  - ' + l.name + ': ' + l.url);
+  }
+  return lines.join('\n');
 }
 
 // ============================================================

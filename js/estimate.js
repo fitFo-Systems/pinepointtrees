@@ -317,17 +317,43 @@ function submitContact(e) {
   };
   state.price = calculateEstimate();
 
-  postLead({
+  // Snapshot the payload now so subsequent state changes (e.g. user starts a
+  // second estimate) can't corrupt the in-flight submission.
+  const payloadBase = {
     formType: 'estimate_contact',
     service: state.service,
-    answers: state.answers,
-    price: state.price,
-    contact: state.contact,
-    page: location.href
+    answers: { ...state.answers },
+    price: { ...state.price },
+    contact: { ...state.contact },
+    page: location.href,
+  };
+
+  // Photos are read asynchronously (FileReader); submit without blocking the UI.
+  readPhotos(document.getElementById('contact-photos')).then(photos => {
+    postLead({ ...payloadBase, photos });
   });
 
   showResult();
   goToStep('result');
+}
+
+// Read up to 6 image files from a <input type="file"> as base64 data URLs.
+// Returns a Promise that resolves to an array of { name, mimeType, dataUrl, size }.
+function readPhotos(input) {
+  if (!input || !input.files || input.files.length === 0) return Promise.resolve([]);
+  const files = Array.from(input.files).slice(0, 6);
+  const reads = files.map(file => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve({
+      name: file.name,
+      mimeType: file.type,
+      dataUrl: reader.result,
+      size: file.size,
+    });
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  }));
+  return Promise.all(reads).then(results => results.filter(Boolean));
 }
 
 function submitSchedule(e) {
