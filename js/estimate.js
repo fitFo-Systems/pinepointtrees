@@ -416,7 +416,6 @@ function submitContact(e) {
   const phoneInput = document.getElementById('contact-phone');
   const emailInput = document.getElementById('contact-email');
   const zipInput   = document.getElementById('contact-zip');
-  const townInput  = document.getElementById('contact-town');
   const notesInput = document.getElementById('contact-notes');
 
   // Validate phone, email, and ZIP before doing anything else.
@@ -449,7 +448,6 @@ function submitContact(e) {
     phone: phoneInput.value,
     email: emailInput.value,
     zip:   zipInput.value.trim(),
-    town:  townInput.value,
     notes: notesInput.value,
   };
   state.price = calculateEstimate();

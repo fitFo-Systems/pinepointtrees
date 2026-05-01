@@ -31,8 +31,7 @@ const SHEETS = {
     name: 'Estimate Leads',
     headers: [
       'Estimate #', 'Timestamp', 'Name', 'Phone', 'Email',
-      'ZIP', 'City (USPS)', 'State', 'Distance (mi)', 'Outside Area',
-      'Town (entered)',
+      'ZIP', 'City', 'State', 'Distance (mi)', 'Outside Area',
       'Service', 'Tree Count', 'Tree Height', 'Hazards', 'Access',
       'Prune Type', 'Lot Size', 'Lot Density', 'End Goal',
       'Price Low', 'Price Typical', 'Price High',
@@ -43,7 +42,7 @@ const SHEETS = {
     name: 'Schedule Requests',
     headers: [
       'Estimate #', 'Timestamp', 'Name', 'Phone', 'Email',
-      'ZIP', 'City (USPS)', 'State', 'Distance (mi)', 'Outside Area',
+      'ZIP', 'City', 'State', 'Distance (mi)', 'Outside Area',
       'Best Time',
       'Service', 'Details', 'Price Typical', 'Notes', 'Photos', 'Page'
     ]
@@ -277,7 +276,6 @@ function writeEstimate(ss, d) {
     new Date(),
     c.name || '', c.phone || '', c.email || '',
     c.zip || '', ac.city || '', ac.state || '', distance, outside,
-    c.town || '',
     d.service || '',
     a.treeCount || '', a.treeHeight || '', a.hazards || '', a.access || '',
     a.pruneType || '', a.lotSize || '', a.lotDensity || '', a.endGoal || '',
@@ -502,14 +500,12 @@ function contactRows(c, areaCheck) {
   const cityState = usps ? (usps.city + ', ' + usps.state) : '';
   const zip = c.zip || '';
   const zipLine = zip + (cityState ? ' (' + cityState + ')' : '');
-  const town = c.town || '';
   const rows = [
     ['Name', escapeHtml(c.name || '(none)')],
     ['Phone', phoneLink(c.phone)],
     ['Email', emailLink(c.email)],
     ['ZIP', escapeHtml(zipLine || '(none)')]
   ];
-  if (town) rows.push(['Town', escapeHtml(town) + ' <span style="color:#888;font-size:12px">(as entered)</span>']);
   if (usps && typeof usps.miles === 'number') {
     rows.push(['Distance', escapeHtml(usps.miles.toFixed(1) + ' mi from Leicester')]);
   }
