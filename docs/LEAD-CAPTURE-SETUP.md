@@ -49,7 +49,23 @@ You can also pull the latest version directly from the live site:
 `https://pinepointtrees.com/docs/google-apps-script-leads.js` — open in a
 browser, View Source, copy all.
 
-## Step 5 — Deploy as a Web App
+## Step 5 — Install the time trigger (one-time)
+
+The script delays the "lead" email by 5 minutes so it can cancel itself if
+the user goes on to schedule a callback (you get one email, not two). That
+delayed-send is driven by a 1-minute time trigger.
+
+1. In the Apps Script editor, change the function dropdown (top toolbar) to
+   **`installTrigger`**.
+2. Click **Run**.
+3. Authorize when prompted (same "Google hasn't verified this app" flow as
+   any first-time Apps Script run — Advanced → Go to project → Allow).
+4. Verify in the **Triggers** tab (clock icon, left sidebar): you should
+   see a row for `processPendingLeads`, time-driven, every 1 minute.
+
+If you re-paste the script later, re-run `installTrigger` — it's idempotent.
+
+## Step 6 — Deploy as a Web App
 
 1. Click **Deploy → New deployment** (top right).
 2. Click the gear icon next to "Select type" → choose **Web app**.
@@ -58,20 +74,22 @@ browser, View Source, copy all.
    - **Execute as:** `Me (your-email@gmail.com)`
    - **Who has access:** **`Anyone`** ← this matters; the website needs to POST anonymously
 4. Click **Deploy**.
-5. Google will prompt for authorization the first time:
-   - Click **Authorize access**
-   - Pick the same Google account
-   - You'll see a "Google hasn't verified this app" warning — that's
-     because *you* are the developer. Click **Advanced** →
-     **Go to (your project name)** → **Allow**.
-6. After deploy, copy the **Web app URL** that's displayed. Looks like:
+5. Authorize again if prompted (same Advanced → Go to project → Allow flow).
+6. Copy the **Web app URL** that's displayed. Looks like:
    ```
    https://script.google.com/macros/s/AKfycbz...long-string.../exec
    ```
 
 **Save that URL — it's the only thing you need from this step.**
 
-## Step 6 — Wire the URL into the website
+### Updating the script later
+
+If you change the code in `Code.gs` after this initial deploy, the URL keeps
+serving the OLD version until you publish a new version: **Deploy → Manage
+deployments → pencil (edit) → Version: New version → Deploy**. The URL stays
+the same.
+
+## Step 7 — Wire the URL into the website
 
 Edit `js/estimate.js` in the repo. Near the top, find:
 
@@ -79,7 +97,7 @@ Edit `js/estimate.js` in the repo. Near the top, find:
 const APPS_SCRIPT_URL = '';
 ```
 
-Paste the URL from Step 5 between the quotes:
+Paste the URL from Step 6 between the quotes:
 
 ```js
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz.../exec';
@@ -87,25 +105,31 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz.../exec';
 
 Commit and push to `main`. GitHub Pages auto-redeploys in ~30 seconds.
 
-## Step 7 — Test end-to-end
+## Step 8 — Test end-to-end
 
-1. Open `https://pinepointtrees.com/estimate.html` in an incognito window
-   (avoid cached JS).
-2. Pick any service, click through the questions, fill the contact form
-   with test data, submit.
-3. Within a few seconds:
-   - The Google Sheet should have a new row in the **Estimate Leads** tab
-   - Your inbox should have a notification email titled **"New Estimate
-     Lead — Pine Point"**
-4. On the price-result screen, click **Schedule a Follow-Up**, fill the
+### Test path A — lead only (no callback scheduled)
+
+1. Incognito window → `https://pinepointtrees.com/estimate.html`.
+2. Click through any service flow, fill the contact form, submit.
+3. **Immediately:** new row in the **Estimate Leads** tab. **No email yet.**
+4. **Wait 5+ minutes**, do nothing else.
+5. Email arrives titled **"New Lead — (their name)"** with parsed
+   job details + price range.
+
+### Test path B — scheduled callback (the qualified case)
+
+1. Incognito window → `https://pinepointtrees.com/estimate.html`.
+2. Click through, fill the contact form, submit.
+3. On the price-result screen, click **Schedule a Follow-Up**, fill the
    modal, submit.
-5. Confirm:
-   - A new row in the **Schedule Requests** tab
-   - A second email titled **"New Schedule Request — Pine Point"**
+4. **Immediately:** new row in the **Schedule Requests** tab + email
+   titled **"Callback Requested — (their name)"**.
+5. **Wait 5+ minutes** — confirm **no follow-up "lead" email arrives**.
+   (The schedule submission cancelled the pending lead email.)
 
-If both work → ship it. If you tested in your personal account, repeat
-Steps 1–5 logged in as `pinepointtreeservice@gmail.com`, swap the URL in
-Step 6 to the new one, push, and you're live in production.
+If both paths work → ship it. If you tested in your personal account,
+repeat Steps 1–6 logged in as `pinepointtreeservice@gmail.com`, swap
+the URL in Step 7 to the new one, push, and you're live in production.
 
 ---
 
