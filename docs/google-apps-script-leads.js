@@ -132,15 +132,27 @@ function doPost(e) {
       if (data.contact) data.contact.phone = normalizePhone(data.contact.phone);
       data.areaCheck = checkServiceArea((data.contact || {}).zip);
       const cancelled = cancelPendingFor(ss, data);
-      // Inherit estimate number from the cancelled pending lead if available,
-      // otherwise fall back to the most recent matching Estimate Leads row
-      // (covers the case where the lead was queued, drained, and the user
-      // came back later to schedule).
-      data.estimateNumber = (cancelled && cancelled.estimateNumber)
-        ? cancelled.estimateNumber
-        : lookupRecentEstimateNumber(ss, data.contact);
-      if (cancelled && cancelled.photoLinks && cancelled.photoLinks.length) {
-        data.photoLinks = cancelled.photoLinks;
+      if (cancelled && cancelled.estimateNumber) {
+        // Schedule arrived inside the EMAIL_DELAY_MINUTES window — the
+        // pending lead email was cancelled in time, so this is the only
+        // notification Jason will see for this customer.
+        data.estimateNumber = cancelled.estimateNumber;
+        if (cancelled.photoLinks && cancelled.photoLinks.length) {
+          data.photoLinks = cancelled.photoLinks;
+        }
+      } else {
+        // Schedule arrived AFTER the lead email already went out (or the
+        // pending row was already drained). Customer linkage still holds
+        // via the matching Estimate # — flag the email so Jason knows
+        // it's the same lead, not a fresh one.
+        const prior = lookupRecentEstimate(ss, data.contact);
+        if (prior) {
+          data.estimateNumber = prior.estimateNumber;
+          data.priorEstimateAt = prior.timestamp;
+          // Lead email goes out EMAIL_DELAY_MINUTES after estimate timestamp.
+          const leadSentBy = new Date(prior.timestamp.getTime() + EMAIL_DELAY_MINUTES * 60 * 1000);
+          data.leadEmailAlreadySent = (new Date() >= leadSentBy);
+        }
       }
       writeSchedule(ss, data);
       sendCallbackEmail(data);
@@ -174,23 +186,26 @@ function nextEstimateNumber() {
   }
 }
 
-function lookupRecentEstimateNumber(ss, contact) {
+function lookupRecentEstimate(ss, contact) {
   const sheet = ss.getSheetByName(SHEETS.estimate_contact.name);
-  if (!sheet) return '';
+  if (!sheet) return null;
   const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return '';
+  if (lastRow < 2) return null;
   const phoneKey = normalizeKey(contact && contact.phone);
   const emailKey = normalizeKey(contact && contact.email);
-  if (!phoneKey && !emailKey) return '';
+  if (!phoneKey && !emailKey) return null;
   // Estimate Leads columns (1-indexed): 1=Estimate #, 2=Timestamp, 3=Name, 4=Phone, 5=Email
   const rows = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
   for (let i = rows.length - 1; i >= 0; i--) {
     if ((phoneKey && normalizeKey(rows[i][3]) === phoneKey) ||
         (emailKey && normalizeKey(rows[i][4]) === emailKey)) {
-      return rows[i][0];
+      return {
+        estimateNumber: rows[i][0],
+        timestamp: rows[i][1] instanceof Date ? rows[i][1] : new Date(rows[i][1])
+      };
     }
   }
-  return '';
+  return null;
 }
 
 /**
@@ -472,7 +487,8 @@ function sendLeadEmail(d) {
     '<h2 style="margin:0 0 4px;color:#2D5A27">New Lead</h2>',
     num ? '<p style="margin:0 0 4px;font-size:13px;color:#444">Estimate #: <strong>' + escapeHtml(num) + '</strong></p>' : '',
     '<p style="margin:0 0 12px;color:#666;font-size:13px">' +
-      'Estimate submitted ' + EMAIL_DELAY_MINUTES + '+ minutes ago, no callback scheduled.</p>',
+      'Estimate submitted ' + EMAIL_DELAY_MINUTES + '+ minutes ago, no callback scheduled yet. ' +
+      'If they schedule one later, you\'ll get a follow-up email referencing this same Estimate #.</p>',
     outsideAreaBanner(d.areaCheck),
     htmlSection('Contact', contactRows(c, d.areaCheck)),
     htmlSection('Job', [
@@ -503,6 +519,7 @@ function sendCallbackEmail(d) {
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#222">',
     '<h2 style="margin:0 0 4px;color:#2D5A27">Callback Requested</h2>',
     num ? '<p style="margin:0 0 12px;font-size:13px;color:#444">Estimate #: <strong>' + escapeHtml(num) + '</strong></p>' : '<div style="height:12px"></div>',
+    leadFollowupBanner(d),
     outsideAreaBanner(d.areaCheck),
     htmlSection('Caller', contactRows(c, d.areaCheck).concat([
       ['Best time', '<strong>' + escapeHtml(d.scheduledTime || '(any)') + '</strong>']
@@ -542,6 +559,27 @@ function contactRows(c, areaCheck) {
     rows.push(['Distance', escapeHtml(usps.miles.toFixed(1) + ' mi from Leicester')]);
   }
   return rows;
+}
+
+/**
+ * Yellow info banner shown on callback emails when the lead email
+ * already went out earlier — tells Jason this is the SAME customer
+ * he's already been notified about, not a brand-new lead.
+ */
+function leadFollowupBanner(d) {
+  if (!d.leadEmailAlreadySent) return '';
+  const when = d.priorEstimateAt
+    ? Utilities.formatDate(new Date(d.priorEstimateAt), Session.getScriptTimeZone(), "MMM d, h:mm a")
+    : '';
+  const num = d.estimateNumber || '';
+  return [
+    '<div style="margin:0 0 16px;padding:10px 14px;background:#fff8d4;border:1px solid #d4ad1a;border-radius:4px;color:#5a4a00;font-size:14px">',
+    '<strong>ℹ Update on existing lead' + (num ? ' #' + escapeHtml(num) : '') + '.</strong> ',
+    'A "New Lead" email was already sent for this customer',
+    when ? ' (estimate submitted ' + escapeHtml(when) + ')' : '',
+    '. They are now scheduling the callback.',
+    '</div>'
+  ].join('');
 }
 
 /**
