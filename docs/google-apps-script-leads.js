@@ -30,7 +30,7 @@ const SHEETS = {
   estimate_contact: {
     name: 'Estimate Leads',
     headers: [
-      'Timestamp', 'Name', 'Phone', 'Email', 'Town',
+      'Estimate #', 'Timestamp', 'Name', 'Phone', 'Email', 'Town',
       'Service', 'Tree Count', 'Tree Height', 'Hazards', 'Access',
       'Prune Type', 'Lot Size', 'Lot Density', 'End Goal',
       'Price Low', 'Price Typical', 'Price High',
@@ -40,7 +40,7 @@ const SHEETS = {
   schedule: {
     name: 'Schedule Requests',
     headers: [
-      'Timestamp', 'Name', 'Phone', 'Email', 'Best Time',
+      'Estimate #', 'Timestamp', 'Name', 'Phone', 'Email', 'Best Time',
       'Service', 'Details', 'Price Typical', 'Notes', 'Photos', 'Page'
     ]
   },
@@ -107,19 +107,30 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
     if (data.formType === 'estimate_contact') {
-      // Save photos first so URLs are available for the sheet row, the
-      // queued payload, and the eventual email. Drop the raw base64 from
-      // the data object before queuing — keeps the sheet payload small.
-      data.photoLinks = savePhotosToDrive(data.photos, data.service, (data.contact || {}).name);
+      if (!isValidContact(data.contact)) {
+        return jsonResponse({ error: 'invalid contact' });
+      }
+      data.estimateNumber = nextEstimateNumber();
+      data.photoLinks = savePhotosToDrive(data.photos, data.estimateNumber, data.service, (data.contact || {}).name);
       delete data.photos;
       writeEstimate(ss, data);
       queueLeadEmail(ss, data);
     } else if (data.formType === 'schedule') {
-      writeSchedule(ss, data);
+      if (!isValidContact(data.contact)) {
+        return jsonResponse({ error: 'invalid contact' });
+      }
       const cancelled = cancelPendingFor(ss, data);
+      // Inherit estimate number from the cancelled pending lead if available,
+      // otherwise fall back to the most recent matching Estimate Leads row
+      // (covers the case where the lead was queued, drained, and the user
+      // came back later to schedule).
+      data.estimateNumber = (cancelled && cancelled.estimateNumber)
+        ? cancelled.estimateNumber
+        : lookupRecentEstimateNumber(ss, data.contact);
       if (cancelled && cancelled.photoLinks && cancelled.photoLinks.length) {
         data.photoLinks = cancelled.photoLinks;
       }
+      writeSchedule(ss, data);
       sendCallbackEmail(data);
     } else {
       writeUnknown(ss, data);
@@ -129,6 +140,59 @@ function doPost(e) {
   } catch (err) {
     return jsonResponse({ error: String(err) });
   }
+}
+
+/**
+ * Returns a fresh, monotonic-per-year estimate number like "26_00001".
+ * Counter is stored in ScriptProperties and incremented under a script-level
+ * lock so concurrent submissions can't collide on the same number.
+ */
+function nextEstimateNumber() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const yy = String(new Date().getFullYear()).slice(2);
+    const key = 'estimate_counter_' + yy;
+    const next = parseInt(props.getProperty(key) || '0', 10) + 1;
+    props.setProperty(key, String(next));
+    return yy + '_' + String(next).padStart(5, '0');
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function lookupRecentEstimateNumber(ss, contact) {
+  const sheet = ss.getSheetByName(SHEETS.estimate_contact.name);
+  if (!sheet) return '';
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return '';
+  const phoneKey = normalizeKey(contact && contact.phone);
+  const emailKey = normalizeKey(contact && contact.email);
+  if (!phoneKey && !emailKey) return '';
+  // Estimate Leads columns (1-indexed): 1=Estimate #, 2=Timestamp, 3=Name, 4=Phone, 5=Email
+  const rows = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if ((phoneKey && normalizeKey(rows[i][3]) === phoneKey) ||
+        (emailKey && normalizeKey(rows[i][4]) === emailKey)) {
+      return rows[i][0];
+    }
+  }
+  return '';
+}
+
+/**
+ * Defense-in-depth: same checks the client runs, applied server-side.
+ * Keeps automated garbage out of the sheet/email even if the client JS
+ * is bypassed.
+ */
+function isValidContact(c) {
+  if (!c) return false;
+  const phoneDigits = String(c.phone || '').replace(/[^0-9]/g, '');
+  if (phoneDigits.length < 7 || phoneDigits.length > 15) return false;
+  if (/^(\d)\1+$/.test(phoneDigits)) return false; // all same digit
+  if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) return false;
+  return true;
 }
 
 function doGet() {
@@ -145,6 +209,7 @@ function writeEstimate(ss, d) {
   const c = d.contact || {};
   const p = d.price || {};
   sheet.appendRow([
+    d.estimateNumber || '',
     new Date(),
     c.name || '', c.phone || '', c.email || '', c.town || '',
     d.service || '',
@@ -160,6 +225,7 @@ function writeSchedule(ss, d) {
   const c = d.contact || {};
   const p = d.price || {};
   sheet.appendRow([
+    d.estimateNumber || '',
     new Date(),
     c.name || '', c.phone || '', c.email || '',
     d.scheduledTime || '',
@@ -297,11 +363,14 @@ function collectRecentScheduleKeys(ss, minutesBack) {
 function sendLeadEmail(d) {
   const c = d.contact || {};
   const p = d.price || {};
-  const subject = 'New Lead — ' + (c.name || 'Pine Point');
+  const num = d.estimateNumber || '';
+  const service = SERVICE_NAMES[d.service] || d.service || '';
+  const subject = 'New Lead - ' + (service ? service + ' ' : '') + (c.name || 'Pine Point');
 
   const html = [
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#222">',
     '<h2 style="margin:0 0 4px;color:#2D5A27">New Lead</h2>',
+    num ? '<p style="margin:0 0 4px;font-size:13px;color:#444">Estimate #: <strong>' + escapeHtml(num) + '</strong></p>' : '',
     '<p style="margin:0 0 20px;color:#666;font-size:13px">' +
       'Estimate submitted ' + EMAIL_DELAY_MINUTES + '+ minutes ago, no callback scheduled.</p>',
     htmlSection('Contact', [
@@ -330,11 +399,14 @@ function sendLeadEmail(d) {
 function sendCallbackEmail(d) {
   const c = d.contact || {};
   const p = d.price || {};
-  const subject = 'Callback Requested — ' + (c.name || 'Pine Point');
+  const num = d.estimateNumber || '';
+  const service = SERVICE_NAMES[d.service] || d.service || '';
+  const subject = 'Callback Requested - ' + (service ? service + ' ' : '') + (c.name || 'Pine Point');
 
   const html = [
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#222">',
-    '<h2 style="margin:0 0 16px;color:#2D5A27">Callback Requested</h2>',
+    '<h2 style="margin:0 0 4px;color:#2D5A27">Callback Requested</h2>',
+    num ? '<p style="margin:0 0 16px;font-size:13px;color:#444">Estimate #: <strong>' + escapeHtml(num) + '</strong></p>' : '<div style="height:12px"></div>',
     htmlSection('Caller', [
       ['Name', escapeHtml(c.name || '(name)')],
       ['Phone', phoneLink(c.phone)],
@@ -477,17 +549,18 @@ function normalizeKey(s) {
  * Folder structure:
  *   Pine Point Lead Photos/
  *     May_26/
- *       May_26_Removal_JohnSmith/
- *         May_26_Removal_JohnSmith_originalfilename.jpg
+ *       26_00001_Removal_JohnSmith/
+ *         originalfilename.jpg
+ *
+ * The estimate number prefix on the per-estimate folder makes the folder
+ * name unique even if the same customer submits twice in the same month.
  */
-function savePhotosToDrive(photos, service, customerName) {
+function savePhotosToDrive(photos, estimateNumber, service, customerName) {
   if (!photos || !photos.length) return [];
-  const now = new Date();
-  const monthYear = formatMonthYear(now);
+  const monthYear = formatMonthYear(new Date());
   const safeService = SERVICE_SHORT[service] || 'Other';
   const safeName = sanitizeName(customerName) || 'Anonymous';
-  const folderName = monthYear + '_' + safeService + '_' + safeName;
-  const filenamePrefix = monthYear + '_' + safeService + '_' + safeName + '_';
+  const folderName = (estimateNumber || 'NoNum') + '_' + safeService + '_' + safeName;
 
   const root = getOrCreatePhotoFolder();
   const monthFolder = getOrCreateChildFolder(root, monthYear);
@@ -501,8 +574,7 @@ function savePhotosToDrive(photos, service, customerName) {
       if (!match) continue;
       const mimeType = match[1];
       const base64 = match[2];
-      const original = (photo.name || 'photo-' + (i + 1)).replace(/[\\/]/g, '_');
-      const filename = filenamePrefix + original;
+      const filename = (photo.name || ('photo-' + (i + 1) + '.jpg')).replace(/[\\/]/g, '_');
       const blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType, filename);
       const file = estimateFolder.createFile(blob);
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
