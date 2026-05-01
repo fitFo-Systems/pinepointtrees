@@ -560,7 +560,14 @@ function submitSchedule(e) {
     service: state.service,
     answers: state.answers,
     price: state.price || calculateEstimate(),
-    contact: { name: sched.name, phone: sched.phone, email: sched.email },
+    // Carry the ZIP captured during the estimate-contact step so the
+    // server can re-run the service-area check and pass validation.
+    contact: {
+      name:  sched.name,
+      phone: sched.phone,
+      email: sched.email,
+      zip:   (state.contact && state.contact.zip) || '',
+    },
     scheduledTime: sched.time,
     scheduleNotes: sched.notes,
     page: location.href

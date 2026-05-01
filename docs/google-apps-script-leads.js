@@ -115,7 +115,7 @@ function doPost(e) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
 
     if (data.formType === 'estimate_contact') {
-      if (!isValidContact(data.contact)) {
+      if (!isValidContact(data.contact, data.formType)) {
         return jsonResponse({ error: 'invalid contact' });
       }
       if (data.contact) data.contact.phone = normalizePhone(data.contact.phone);
@@ -126,7 +126,7 @@ function doPost(e) {
       writeEstimate(ss, data);
       queueLeadEmail(ss, data);
     } else if (data.formType === 'schedule') {
-      if (!isValidContact(data.contact)) {
+      if (!isValidContact(data.contact, data.formType)) {
         return jsonResponse({ error: 'invalid contact' });
       }
       if (data.contact) data.contact.phone = normalizePhone(data.contact.phone);
@@ -198,13 +198,26 @@ function lookupRecentEstimateNumber(ss, contact) {
  * Keeps automated garbage out of the sheet/email even if the client JS
  * is bypassed.
  */
-function isValidContact(c) {
+/**
+ * Defense-in-depth validation. ZIP is mandatory on the initial estimate
+ * contact form, but the schedule modal doesn't collect ZIP — the client
+ * carries it forward from state.contact, but we still want schedule
+ * submissions to succeed if it's missing for any reason.
+ */
+function isValidContact(c, formType) {
   if (!c) return false;
   const phoneDigits = String(c.phone || '').replace(/[^0-9]/g, '');
   if (phoneDigits.length < 10 || phoneDigits.length > 15) return false;
   if (/^(\d)\1+$/.test(phoneDigits)) return false; // all same digit
   if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) return false;
-  if (!/^\d{5}(-\d{4})?$/.test(String(c.zip || '').trim())) return false;
+
+  const zip = String(c.zip || '').trim();
+  if (formType === 'estimate_contact') {
+    if (!/^\d{5}(-\d{4})?$/.test(zip)) return false;
+  } else if (zip) {
+    // Schedule etc.: zip is optional, but if provided must be valid.
+    if (!/^\d{5}(-\d{4})?$/.test(zip)) return false;
+  }
   return true;
 }
 
