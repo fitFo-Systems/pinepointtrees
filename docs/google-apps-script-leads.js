@@ -118,6 +118,7 @@ function doPost(e) {
       if (!isValidContact(data.contact)) {
         return jsonResponse({ error: 'invalid contact' });
       }
+      if (data.contact) data.contact.phone = normalizePhone(data.contact.phone);
       data.estimateNumber = nextEstimateNumber();
       data.areaCheck = checkServiceArea((data.contact || {}).zip);
       data.photoLinks = savePhotosToDrive(data.photos, data.estimateNumber, data.service, (data.contact || {}).name);
@@ -128,6 +129,7 @@ function doPost(e) {
       if (!isValidContact(data.contact)) {
         return jsonResponse({ error: 'invalid contact' });
       }
+      if (data.contact) data.contact.phone = normalizePhone(data.contact.phone);
       data.areaCheck = checkServiceArea((data.contact || {}).zip);
       const cancelled = cancelPendingFor(ss, data);
       // Inherit estimate number from the cancelled pending lead if available,
@@ -199,11 +201,28 @@ function lookupRecentEstimateNumber(ss, contact) {
 function isValidContact(c) {
   if (!c) return false;
   const phoneDigits = String(c.phone || '').replace(/[^0-9]/g, '');
-  if (phoneDigits.length < 7 || phoneDigits.length > 15) return false;
+  if (phoneDigits.length < 10 || phoneDigits.length > 15) return false;
   if (/^(\d)\1+$/.test(phoneDigits)) return false; // all same digit
   if (c.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) return false;
   if (!/^\d{5}(-\d{4})?$/.test(String(c.zip || '').trim())) return false;
   return true;
+}
+
+/**
+ * Normalize an inbound phone string to a consistent display format so
+ * the sheet and email always show "(508) 555-1234" or "+1 (508) 555-1234"
+ * regardless of what the user typed.
+ */
+function normalizePhone(s) {
+  const digits = String(s || '').replace(/[^0-9]/g, '');
+  if (digits.length === 10) {
+    return '(' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6);
+  }
+  if (digits.length === 11 && digits[0] === '1') {
+    return '+1 (' + digits.slice(1, 4) + ') ' + digits.slice(4, 7) + '-' + digits.slice(7);
+  }
+  if (digits.length > 0) return digits;
+  return '';
 }
 
 /**

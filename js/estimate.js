@@ -89,6 +89,8 @@ const serviceNames = {
 document.addEventListener('DOMContentLoaded', () => {
   updateProgress();
   setupPhotoInput();
+  attachPhoneFormatter(document.getElementById('contact-phone'));
+  attachPhoneFormatter(document.getElementById('sched-phone'));
 });
 
 // --- Photo selection UI ---
@@ -158,10 +160,12 @@ function photosTotalBytes() {
 }
 
 // --- Field validation (keeps obvious garbage out without nagging real users) ---
+// Phone: needs at least 10 digits (US format), accepts any separator style
+// since the input is auto-formatted as the user types.
 function isValidPhone(s) {
   const digits = String(s || '').replace(/[^0-9]/g, '');
-  if (digits.length < 7 || digits.length > 15) return false;
-  if (/^(\d)\1+$/.test(digits)) return false; // all same digit
+  if (digits.length < 10 || digits.length > 15) return false;
+  if (/^(\d)\1+$/.test(digits)) return false; // all same digit (0000000000, etc.)
   return true;
 }
 
@@ -176,14 +180,48 @@ function isValidZip(s) {
   return /^\d{5}(-\d{4})?$/.test(String(s || '').trim());
 }
 
-function flagInvalid(input, message) {
-  if (!input) return;
-  input.setCustomValidity(message);
-  input.reportValidity();
+// Re-formats a phone string as the user types: "5085551234" → "(508) 555-1234"
+// "15085551234" → "+1 (508) 555-1234". Strips non-digits and caps at 11 to keep
+// US-shaped input clean.
+function formatPhoneAsTyped(value) {
+  const digits = String(value || '').replace(/[^0-9]/g, '').slice(0, 11);
+  if (digits.length === 0) return '';
+  if (digits.length <= 3) return '(' + digits;
+  if (digits.length <= 6) return '(' + digits.slice(0, 3) + ') ' + digits.slice(3);
+  if (digits.length <= 10) return '(' + digits.slice(0, 3) + ') ' + digits.slice(3, 6) + '-' + digits.slice(6);
+  return '+' + digits.slice(0, 1) + ' (' + digits.slice(1, 4) + ') ' + digits.slice(4, 7) + '-' + digits.slice(7);
 }
 
-function clearInvalid(input) {
-  if (input) input.setCustomValidity('');
+function attachPhoneFormatter(input) {
+  if (!input) return;
+  input.addEventListener('input', () => {
+    input.value = formatPhoneAsTyped(input.value);
+    if (isValidPhone(input.value)) clearFieldError(input);
+  });
+}
+
+// Inline visible error messaging — replaces the easy-to-miss native tooltip.
+function showFieldError(input, message) {
+  if (!input) return;
+  let err = input.parentElement.querySelector('.field-error');
+  if (!err) {
+    err = document.createElement('div');
+    err.className = 'field-error';
+    input.parentElement.appendChild(err);
+  }
+  err.textContent = message;
+  input.classList.add('input--error');
+  input.setCustomValidity(message);
+  input.focus();
+  input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function clearFieldError(input) {
+  if (!input) return;
+  const err = input.parentElement.querySelector('.field-error');
+  if (err) err.textContent = '';
+  input.classList.remove('input--error');
+  input.setCustomValidity('');
 }
 
 // --- Service Selection ---
@@ -420,22 +458,22 @@ function submitContact(e) {
 
   // Validate phone, email, and ZIP before doing anything else.
   if (!isValidPhone(phoneInput.value)) {
-    flagInvalid(phoneInput, 'Please enter a valid phone number we can call you back on.');
+    showFieldError(phoneInput, 'Enter a 10-digit phone number we can call you back on.');
     return;
   }
-  clearInvalid(phoneInput);
+  clearFieldError(phoneInput);
 
   if (!isValidEmail(emailInput.value)) {
-    flagInvalid(emailInput, 'Please enter a valid email address (or leave it blank).');
+    showFieldError(emailInput, "That email doesn't look right. Double-check the @ and the domain, or leave it blank.");
     return;
   }
-  clearInvalid(emailInput);
+  clearFieldError(emailInput);
 
   if (!isValidZip(zipInput.value)) {
-    flagInvalid(zipInput, 'Please enter a valid 5-digit ZIP code.');
+    showFieldError(zipInput, 'Enter a 5-digit ZIP code.');
     return;
   }
-  clearInvalid(zipInput);
+  clearFieldError(zipInput);
 
   if (photosTotalBytes() > MAX_PHOTOS_TOTAL_BYTES) {
     const status = document.getElementById('photo-status');
@@ -498,16 +536,16 @@ function submitSchedule(e) {
   const emailInput = document.getElementById('sched-email');
 
   if (!isValidPhone(phoneInput.value)) {
-    flagInvalid(phoneInput, 'Please enter a valid phone number we can call you back on.');
+    showFieldError(phoneInput, 'Enter a 10-digit phone number we can call you back on.');
     return;
   }
-  clearInvalid(phoneInput);
+  clearFieldError(phoneInput);
 
   if (!isValidEmail(emailInput.value)) {
-    flagInvalid(emailInput, 'Please enter a valid email address (or leave it blank).');
+    showFieldError(emailInput, "That email doesn't look right. Double-check the @ and the domain, or leave it blank.");
     return;
   }
-  clearInvalid(emailInput);
+  clearFieldError(emailInput);
 
   const sched = {
     name:  document.getElementById('sched-name').value,

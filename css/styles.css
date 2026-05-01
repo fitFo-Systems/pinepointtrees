@@ -1134,6 +1134,20 @@ h3 { font-size: var(--font-size-xl); }
   font-weight: 600;
 }
 
+.field-error {
+  color: #ff6b3d;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+.field-error:empty {
+  display: none;
+}
+.input--error {
+  border-color: #ff6b3d !important;
+}
+
 /* Progress Bar */
 .progress-bar {
   height: 4px;
