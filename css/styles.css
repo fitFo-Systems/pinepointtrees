@@ -1044,6 +1044,33 @@ h3 { font-size: var(--font-size-xl); }
   height: 44px;
 }
 
+.estimate-header__back {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-white);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.estimate-header__back:hover .estimate-header__back-text {
+  text-decoration: underline;
+}
+.estimate-header__back-arrow {
+  font-size: 1.3em;
+  line-height: 1;
+  color: var(--color-light-gray);
+}
+.estimate-header__back-logo {
+  height: 36px;
+}
+.estimate-header__back-text {
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .estimate-header__back-text { display: none; }
+}
+
 .estimate-header__phone {
   color: var(--color-white);
   font-weight: 600;
