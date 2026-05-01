@@ -900,12 +900,12 @@ function getOrCreate(ss, def) {
  * Forwards a handoff-page submission as a plain email. Subject + body
  * come from the form fields; no sheet writes, no lead pipeline.
  *
- * Sent to keith@fitfosystems.com explicitly so it lands at the FITFO
+ * Sent to fitfo@fitfosystems.com explicitly so it lands at the FITFO
  * inbox regardless of which Google account this script is deployed
  * under.
  */
 function sendHandoffEmail(data) {
-  const HANDOFF_NOTIFY = 'keith@fitfosystems.com';
+  const HANDOFF_NOTIFY = 'fitfo@fitfosystems.com';
   const subject = data._subject || ('[Pine Point handoff] ' + (data.formType || 'note'));
   const lines = [];
   if (data.message) lines.push(String(data.message));
