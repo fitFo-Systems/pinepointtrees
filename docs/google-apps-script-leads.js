@@ -10,6 +10,11 @@
  *   - Estimate filled + schedule from same phone/email      → "Callback Requested" email only
  * Both submissions still write rows to their respective sheet tabs regardless.
  *
+ * The trigger that sends "New Lead" emails also defends against a race where
+ * the schedule POST lands at the server before the estimate_contact POST: it
+ * checks the Schedule Requests sheet for a recent matching row and skips the
+ * lead email if one exists.
+ *
  * Setup once per deployment — see docs/LEAD-CAPTURE-SETUP.md for the full walk-through.
  * Short version:
  *   1. Paste this code into Code.gs in the Apps Script editor
@@ -19,6 +24,7 @@
 
 const NOTIFY_EMAIL = Session.getEffectiveUser().getEmail();
 const EMAIL_DELAY_MINUTES = 5;
+const ATTACHMENT_TOTAL_LIMIT_BYTES = 15 * 1024 * 1024;  // skip attaching once the total exceeds this
 
 const SHEETS = {
   estimate_contact: {
@@ -50,6 +56,13 @@ const SERVICE_NAMES = {
   removal: 'Tree Removal',
   trimming: 'Trimming & Pruning',
   lot_clearing: 'Lot Clearing'
+};
+
+// Short PascalCase name used in folder + filename patterns.
+const SERVICE_SHORT = {
+  removal: 'Removal',
+  trimming: 'Trimming',
+  lot_clearing: 'LotClearing'
 };
 
 const LABELS = {
@@ -96,17 +109,14 @@ function doPost(e) {
     if (data.formType === 'estimate_contact') {
       // Save photos first so URLs are available for the sheet row, the
       // queued payload, and the eventual email. Drop the raw base64 from
-      // the data object before queuing — keeps Properties/sheet payload small.
-      data.photoLinks = savePhotosToDrive(data.photos);
+      // the data object before queuing — keeps the sheet payload small.
+      data.photoLinks = savePhotosToDrive(data.photos, data.service, (data.contact || {}).name);
       delete data.photos;
       writeEstimate(ss, data);
       queueLeadEmail(ss, data);
     } else if (data.formType === 'schedule') {
       writeSchedule(ss, data);
       const cancelled = cancelPendingFor(ss, data);
-      // Carry over photo links from the cancelled lead, if any, so the
-      // callback email has the same context the customer would've gotten
-      // from a delayed lead email.
       if (cancelled && cancelled.photoLinks && cancelled.photoLinks.length) {
         data.photoLinks = cancelled.photoLinks;
       }
@@ -200,7 +210,6 @@ function cancelPendingFor(ss, d) {
 
   const rows = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
   let matchedPayload = null;
-  // Iterate bottom-up so deleteRow indices stay correct.
   for (let i = rows.length - 1; i >= 0; i--) {
     const pendingPhone = rows[i][1];
     const pendingEmail = rows[i][2];
@@ -219,8 +228,8 @@ function cancelPendingFor(ss, d) {
 /**
  * Called by the 1-minute time trigger installed by installTrigger().
  * Walks the pending queue and sends a "New Lead" email for any entry older
- * than EMAIL_DELAY_MINUTES. Entries cancelled by a schedule submission are
- * already gone from the queue.
+ * than EMAIL_DELAY_MINUTES *unless* a matching schedule row already exists
+ * (which would mean the user did schedule — they just raced the network).
  */
 function processPendingLeads() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -229,6 +238,12 @@ function processPendingLeads() {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return;
 
+  // Build the set of phone/email keys that scheduled a callback recently.
+  // A schedule POST landing on the server BEFORE its matching estimate_contact
+  // POST (race triggered by client-side photo encoding latency) leaves nothing
+  // for cancelPendingFor() to delete; this safety net catches that case.
+  const scheduledKeys = collectRecentScheduleKeys(ss, EMAIL_DELAY_MINUTES + 5);
+
   const cutoff = new Date(Date.now() - EMAIL_DELAY_MINUTES * 60 * 1000);
   const rows = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
 
@@ -236,86 +251,211 @@ function processPendingLeads() {
     const queuedAt = new Date(rows[i][0]);
     if (queuedAt > cutoff) continue;
 
-    try {
-      const data = JSON.parse(rows[i][3]);
-      sendLeadEmail(data);
-    } catch (e) {
-      // Skip malformed rows but still remove from queue.
+    const phoneKey = rows[i][1];
+    const emailKey = rows[i][2];
+    const alreadyScheduled =
+      (phoneKey && scheduledKeys.has(phoneKey)) ||
+      (emailKey && scheduledKeys.has(emailKey));
+
+    if (!alreadyScheduled) {
+      try {
+        const data = JSON.parse(rows[i][3]);
+        sendLeadEmail(data);
+      } catch (e) {
+        // Skip malformed rows but still remove from the queue.
+      }
     }
     sheet.deleteRow(i + 2);
   }
 }
 
+function collectRecentScheduleKeys(ss, minutesBack) {
+  const sheet = ss.getSheetByName(SHEETS.schedule.name);
+  const keys = new Set();
+  if (!sheet) return keys;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return keys;
+
+  const cutoff = new Date(Date.now() - minutesBack * 60 * 1000);
+  // Schedule columns: 1=Timestamp, 3=Phone, 4=Email
+  const rows = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  for (const r of rows) {
+    const ts = new Date(r[0]);
+    if (ts < cutoff) continue;
+    const pk = normalizeKey(r[2]);
+    const ek = normalizeKey(r[3]);
+    if (pk) keys.add(pk);
+    if (ek) keys.add(ek);
+  }
+  return keys;
+}
+
 // ============================================================
-// Email composition
+// Email composition (HTML + plain-text fallback, with photo attachments)
 // ============================================================
 
 function sendLeadEmail(d) {
   const c = d.contact || {};
   const p = d.price || {};
   const subject = 'New Lead — ' + (c.name || 'Pine Point');
-  const body = [
-    'NEW LEAD — Pine Point Tree Service',
-    '(They got an estimate but did not schedule a callback)',
-    '====================================================',
-    '',
-    'Contact:',
-    '  Name:  ' + (c.name || '(none)'),
-    '  Phone: ' + (c.phone || '(none)'),
-    '  Email: ' + (c.email || '(none)'),
-    '  Town:  ' + (c.town || '(none)'),
-    '',
-    'Service: ' + (SERVICE_NAMES[d.service] || d.service || ''),
-    formatAnswers(d.service, d.answers),
-    '',
-    'Estimated price range:',
-    '  Low:     $' + (p.low || '?'),
-    '  Typical: $' + (p.typical || '?'),
-    '  High:    $' + (p.high || '?'),
-    '',
-    'Their notes: ' + (c.notes || '(none)'),
-    formatPhotosForEmail(d.photoLinks),
-    '',
-    'Source page: ' + (d.page || '')
-  ].join('\n');
-  notify(subject, body);
+
+  const html = [
+    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#222">',
+    '<h2 style="margin:0 0 4px;color:#2D5A27">New Lead</h2>',
+    '<p style="margin:0 0 20px;color:#666;font-size:13px">' +
+      'Estimate submitted ' + EMAIL_DELAY_MINUTES + '+ minutes ago, no callback scheduled.</p>',
+    htmlSection('Contact', [
+      ['Name', escapeHtml(c.name || '(none)')],
+      ['Phone', phoneLink(c.phone)],
+      ['Email', emailLink(c.email)],
+      ['Town', escapeHtml(c.town || '(none)')]
+    ]),
+    htmlSection('Job', [
+      ['Service', '<strong>' + escapeHtml(SERVICE_NAMES[d.service] || d.service || '') + '</strong>']
+    ].concat(answerRows(d.service, d.answers))),
+    htmlSection('Estimated price', [
+      ['Low',     '$' + escapeHtml(p.low || '?')],
+      ['Typical', '<strong>$' + escapeHtml(p.typical || '?') + '</strong>'],
+      ['High',    '$' + escapeHtml(p.high || '?')]
+    ]),
+    c.notes ? htmlSection('Their notes', [['', escapeHtml(c.notes)]]) : '',
+    formatPhotosHtml(d.photoLinks),
+    '<p style="color:#888;font-size:12px;margin-top:24px">Source: ' + escapeHtml(d.page || '') + '</p>',
+    '</div>'
+  ].join('');
+
+  sendHtmlEmail(subject, html, buildAttachments(d.photoLinks));
 }
 
 function sendCallbackEmail(d) {
   const c = d.contact || {};
   const p = d.price || {};
   const subject = 'Callback Requested — ' + (c.name || 'Pine Point');
-  const body = [
-    'CALLBACK REQUESTED — Pine Point Tree Service',
-    '(They want a call — qualified lead)',
-    '============================================',
-    '',
-    (c.name || '(name)') + ' (' + (c.phone || '?') + ')',
-    'Best time to call:  ' + (d.scheduledTime || '(any)'),
-    'Email:              ' + (c.email || '(none)'),
-    '',
-    'Service: ' + (SERVICE_NAMES[d.service] || d.service || ''),
-    formatAnswers(d.service, d.answers),
-    '',
-    'Estimated price (typical): $' + (p.typical || '?'),
-    '',
-    'Their note: ' + (d.scheduleNotes || '(none)'),
-    formatPhotosForEmail(d.photoLinks)
-  ].join('\n');
-  notify(subject, body);
+
+  const html = [
+    '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#222">',
+    '<h2 style="margin:0 0 16px;color:#2D5A27">Callback Requested</h2>',
+    htmlSection('Caller', [
+      ['Name', escapeHtml(c.name || '(name)')],
+      ['Phone', phoneLink(c.phone)],
+      ['Email', emailLink(c.email)],
+      ['Best time', '<strong>' + escapeHtml(d.scheduledTime || '(any)') + '</strong>']
+    ]),
+    htmlSection('Job', [
+      ['Service', '<strong>' + escapeHtml(SERVICE_NAMES[d.service] || d.service || '') + '</strong>']
+    ].concat(answerRows(d.service, d.answers))),
+    htmlSection('Estimate', [
+      ['Typical price', '<strong>$' + escapeHtml(p.typical || '?') + '</strong>']
+    ]),
+    d.scheduleNotes ? htmlSection('Their note', [['', escapeHtml(d.scheduleNotes)]]) : '',
+    formatPhotosHtml(d.photoLinks),
+    '</div>'
+  ].join('');
+
+  sendHtmlEmail(subject, html, buildAttachments(d.photoLinks));
 }
 
-function formatAnswers(service, answers) {
-  if (!service || !answers) return '';
+function htmlSection(title, rows) {
+  const inner = rows.map(function (r) {
+    const label = r[0]
+      ? '<td style="padding:4px 12px 4px 0;color:#666;font-size:13px;vertical-align:top;white-space:nowrap">' + escapeHtml(r[0]) + ':</td>'
+      : '<td></td>';
+    return '<tr>' + label + '<td style="padding:4px 0;font-size:14px">' + r[1] + '</td></tr>';
+  }).join('');
+  return [
+    '<h3 style="margin:18px 0 6px;font-size:14px;letter-spacing:0.5px;text-transform:uppercase;color:#444">' + escapeHtml(title) + '</h3>',
+    '<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse">',
+    inner,
+    '</table>'
+  ].join('');
+}
+
+function answerRows(service, answers) {
+  if (!service || !answers) return [];
   const labelMap = LABELS[service] || {};
-  const lines = [];
+  const rows = [];
   for (const key of Object.keys(answers)) {
     const labelName = KEY_LABELS[key] || humanizeKey(key);
     const valueLabels = labelMap[key];
     const display = (valueLabels && valueLabels[answers[key]]) || answers[key];
-    lines.push('  - ' + labelName + ': ' + display);
+    rows.push([labelName, escapeHtml(display)]);
   }
-  return lines.length ? 'Job details:\n' + lines.join('\n') : '';
+  return rows;
+}
+
+function formatPhotosHtml(links) {
+  if (!links || !links.length) return '';
+  const items = links.map(function (l) {
+    return '<li style="margin:4px 0"><a href="' + escapeHtml(l.url) + '" style="color:#2D5A27">' + escapeHtml(l.name) + '</a></li>';
+  }).join('');
+  return [
+    '<h3 style="margin:18px 0 6px;font-size:14px;letter-spacing:0.5px;text-transform:uppercase;color:#444">Photos (' + links.length + ')</h3>',
+    '<p style="margin:4px 0;color:#666;font-size:12px">Attached below + Drive links:</p>',
+    '<ul style="margin:4px 0 0 18px;padding:0;font-size:14px">' + items + '</ul>'
+  ].join('');
+}
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function phoneLink(p) {
+  if (!p) return '<em style="color:#888">(none)</em>';
+  const digits = String(p).replace(/[^0-9]/g, '');
+  if (!digits) return escapeHtml(p);
+  const tel = digits.length === 10 ? '+1' + digits : '+' + digits;
+  return '<a href="tel:' + escapeHtml(tel) + '" style="color:#2D5A27;font-weight:600">' + escapeHtml(p) + '</a>';
+}
+
+function emailLink(e) {
+  if (!e) return '<em style="color:#888">(none)</em>';
+  return '<a href="mailto:' + escapeHtml(e) + '" style="color:#2D5A27">' + escapeHtml(e) + '</a>';
+}
+
+function htmlToText(html) {
+  return String(html)
+    .replace(/<\/(p|h[1-6]|li|tr|div)>/gi, '\n')
+    .replace(/<br\s*\/?>(?!\n)/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function sendHtmlEmail(subject, html, attachments) {
+  const opts = { htmlBody: html };
+  if (attachments && attachments.length) opts.attachments = attachments;
+  try {
+    MailApp.sendEmail(NOTIFY_EMAIL, subject, htmlToText(html), opts);
+  } catch (e) {
+    // Sheet writes are the source of truth — never fail the whole submission.
+  }
+}
+
+function buildAttachments(links) {
+  if (!links || !links.length) return [];
+  const blobs = [];
+  let total = 0;
+  for (const l of links) {
+    if (!l.fileId) continue;
+    try {
+      const file = DriveApp.getFileById(l.fileId);
+      const size = file.getSize();
+      if (total + size > ATTACHMENT_TOTAL_LIMIT_BYTES) break;
+      blobs.push(file.getBlob());
+      total += size;
+    } catch (e) {
+      // File may have been deleted/moved — skip; the email still has the link.
+    }
+  }
+  return blobs;
 }
 
 function humanizeKey(key) {
@@ -327,17 +467,32 @@ function normalizeKey(s) {
 }
 
 // ============================================================
-// Photo upload to Drive
+// Photo upload to Drive (organized: <root>/<MMM_YY>/<MMM_YY_Service_Name>/files)
 // ============================================================
 
 /**
  * Decodes each base64 data-URL photo from the payload, saves it to the
- * "Pine Point Lead Photos" Drive folder, and returns an array of
- * { name, url } so the caller can render them in the email and sheet.
+ * appropriate subfolder, and returns an array of { name, url, fileId }.
+ *
+ * Folder structure:
+ *   Pine Point Lead Photos/
+ *     May_26/
+ *       May_26_Removal_JohnSmith/
+ *         May_26_Removal_JohnSmith_originalfilename.jpg
  */
-function savePhotosToDrive(photos) {
+function savePhotosToDrive(photos, service, customerName) {
   if (!photos || !photos.length) return [];
-  const folder = getOrCreatePhotoFolder();
+  const now = new Date();
+  const monthYear = formatMonthYear(now);
+  const safeService = SERVICE_SHORT[service] || 'Other';
+  const safeName = sanitizeName(customerName) || 'Anonymous';
+  const folderName = monthYear + '_' + safeService + '_' + safeName;
+  const filenamePrefix = monthYear + '_' + safeService + '_' + safeName + '_';
+
+  const root = getOrCreatePhotoFolder();
+  const monthFolder = getOrCreateChildFolder(root, monthYear);
+  const estimateFolder = getOrCreateChildFolder(monthFolder, folderName);
+
   const links = [];
   for (let i = 0; i < photos.length; i++) {
     const photo = photos[i];
@@ -346,16 +501,26 @@ function savePhotosToDrive(photos) {
       if (!match) continue;
       const mimeType = match[1];
       const base64 = match[2];
-      const filename = (photo.name || 'photo-' + (i + 1)).replace(/[\\/]/g, '_');
+      const original = (photo.name || 'photo-' + (i + 1)).replace(/[\\/]/g, '_');
+      const filename = filenamePrefix + original;
       const blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType, filename);
-      const file = folder.createFile(blob);
+      const file = estimateFolder.createFile(blob);
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      links.push({ name: filename, url: file.getUrl() });
+      links.push({ name: filename, url: file.getUrl(), fileId: file.getId() });
     } catch (e) {
       // Skip individual photo failures rather than losing the whole submission.
     }
   }
   return links;
+}
+
+function formatMonthYear(d) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return months[d.getMonth()] + '_' + String(d.getFullYear()).slice(2);
+}
+
+function sanitizeName(s) {
+  return (s || '').toString().replace(/[^a-zA-Z0-9]/g, '');
 }
 
 function getOrCreatePhotoFolder() {
@@ -364,18 +529,15 @@ function getOrCreatePhotoFolder() {
   return DriveApp.createFolder(PHOTO_FOLDER_NAME);
 }
 
-function formatPhotoUrls(links) {
-  if (!links || !links.length) return '';
-  return links.map(l => l.url).join('\n');
+function getOrCreateChildFolder(parent, name) {
+  const folders = parent.getFoldersByName(name);
+  if (folders.hasNext()) return folders.next();
+  return parent.createFolder(name);
 }
 
-function formatPhotosForEmail(links) {
+function formatPhotoUrls(links) {
   if (!links || !links.length) return '';
-  const lines = ['', 'Photos (' + links.length + '):'];
-  for (const l of links) {
-    lines.push('  - ' + l.name + ': ' + l.url);
-  }
-  return lines.join('\n');
+  return links.map(function (l) { return l.url; }).join('\n');
 }
 
 // ============================================================
@@ -391,14 +553,6 @@ function getOrCreate(ss, def) {
     s.getRange(1, 1, 1, def.headers.length).setFontWeight('bold');
   }
   return s;
-}
-
-function notify(subject, body) {
-  try {
-    MailApp.sendEmail(NOTIFY_EMAIL, subject, body);
-  } catch (e) {
-    // Don't fail the submission if email fails — sheet write is the source of truth.
-  }
 }
 
 function jsonResponse(obj) {
