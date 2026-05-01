@@ -175,6 +175,10 @@ function doPost(e) {
       removeEstimateRow(ss, data.estimateNumber);
       upsertSummary(ss, data, 'Callback');
       sendCallbackEmail(data);
+    } else if (data.formType === 'handoff_input' || data.formType === 'handoff_test') {
+      // Posted from the FITFO handoff page (fitfo-systems.github.io/pinepoint-handoff/).
+      // Just forward as an email — no sheet writes, no lead-capture machinery.
+      sendHandoffEmail(data);
     } else {
       writeUnknown(ss, data);
     }
@@ -890,6 +894,31 @@ function getOrCreate(ss, def) {
     s.hideSheet();
   }
   return s;
+}
+
+/**
+ * Forwards a handoff-page submission as a plain email. Subject + body
+ * come from the form fields; no sheet writes, no lead pipeline.
+ *
+ * Sent to keith@fitfosystems.com explicitly so it lands at the FITFO
+ * inbox regardless of which Google account this script is deployed
+ * under.
+ */
+function sendHandoffEmail(data) {
+  const HANDOFF_NOTIFY = 'keith@fitfosystems.com';
+  const subject = data._subject || ('[Pine Point handoff] ' + (data.formType || 'note'));
+  const lines = [];
+  if (data.message) lines.push(String(data.message));
+  if (data.kind) lines.push('', '---', 'Kind: ' + data.kind);
+  if (data.page) lines.push('Page: ' + data.page);
+  if (data.ok_count != null || data.issue_count != null) {
+    lines.push('OK: ' + (data.ok_count || 0) + ', Issues: ' + (data.issue_count || 0) + ', Untested: ' + (data.untested_count || 0));
+  }
+  try {
+    MailApp.sendEmail(HANDOFF_NOTIFY, subject, lines.join('\n') || '(empty body)');
+  } catch (e) {
+    // Don't crash the request if email fails — POSTer doesn't need to know.
+  }
 }
 
 function jsonResponse(obj) {
