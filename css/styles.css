@@ -1077,6 +1077,63 @@ h3 { font-size: var(--font-size-xl); }
   font-size: var(--font-size-lg);
 }
 
+.photo-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.photo-list:empty {
+  display: none;
+}
+.photo-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: var(--color-charcoal);
+  border: 1px solid var(--color-dark-gray);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: var(--color-white);
+}
+.photo-list-item__name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 12px;
+}
+.photo-list-item__size {
+  color: var(--color-light-gray);
+  font-size: 0.85em;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+.photo-list-item__delete {
+  background: none;
+  border: none;
+  color: var(--color-light-gray);
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+.photo-list-item__delete:hover {
+  color: var(--color-white);
+}
+.photo-status {
+  font-size: 0.85rem;
+  color: var(--color-light-gray);
+  margin-top: 8px;
+}
+.photo-status:empty {
+  display: none;
+}
+.photo-status--error {
+  color: #c85a28;
+  font-weight: 600;
+}
+
 /* Progress Bar */
 .progress-bar {
   height: 4px;

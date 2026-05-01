@@ -306,8 +306,10 @@
           <textarea id="contact-notes" rows="2" placeholder="Optional — describe anything specific about the job" style="padding: 14px 16px; background: var(--color-charcoal); border: 2px solid var(--color-dark-gray); border-radius: 4px; color: var(--color-white); font-family: var(--font-family); font-size: 1rem; resize: vertical; width: 100%;"></textarea>
         </div>
         <div class="form-group">
-          <label>Photos (optional) — helps us understand the job before we follow up</label>
+          <label>Photos (optional, up to 6 · 25 MB total) — helps us understand the job before we follow up</label>
           <input type="file" id="contact-photos" accept="image/*" multiple style="padding: 12px; background: var(--color-charcoal); border: 2px solid var(--color-dark-gray); border-radius: 4px; color: var(--color-light-gray); font-family: var(--font-family); width: 100%;">
+          <div id="photo-list" class="photo-list"></div>
+          <div id="photo-status" class="photo-status"></div>
         </div>
         <div class="form-submit">
           <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">See My Estimate</button>
@@ -412,6 +414,7 @@
         <p style="color: var(--color-green); font-weight: 700; font-size: 1.125rem; margin-bottom: 6px;">You're on the list.</p>
         <p style="color: var(--color-light-gray); font-size: 0.9rem;">We'll call during your preferred window.</p>
         <p style="color: var(--color-light-gray); font-size: 0.9rem; margin-top: 4px;">Need us sooner? <a href="tel:+17742622145" style="color: var(--color-white); text-decoration: underline; white-space: nowrap;">(774)&nbsp;262-2145</a></p>
+        <a href="index.html" class="btn btn-outline" style="margin-top: 18px; display: inline-block;">Back to homepage</a>
       </div>
     </div>
   </div>

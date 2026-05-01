@@ -9,11 +9,16 @@
 // docs/LEAD-CAPTURE-SETUP.md
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz68dVyIGyruTPSofHei6UqcbkBuDZKhGybFLFjcowc2uCSIkDol4NWOJ0FOZdqlxOXpQ/exec';
 
+// --- Photo limits (kept under Apps Script's ~50 MB POST cap after base64 overhead) ---
+const MAX_PHOTOS = 6;
+const MAX_PHOTOS_TOTAL_BYTES = 25 * 1024 * 1024;
+
 // --- State ---
 const state = {
   service: null,
   answers: {},
   contact: {},
+  photos: [],            // Array of File objects, capped at MAX_PHOTOS
   price: null,
   history: ['service'],  // step navigation history for back button
   currentStep: 'service'
@@ -83,12 +88,104 @@ const serviceNames = {
 // --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
   updateProgress();
+  setupPhotoInput();
 });
+
+// --- Photo selection UI ---
+function setupPhotoInput() {
+  const input = document.getElementById('contact-photos');
+  if (!input) return;
+  input.addEventListener('change', (e) => {
+    const incoming = Array.from(e.target.files || []);
+    for (const f of incoming) {
+      if (state.photos.length >= MAX_PHOTOS) break;
+      // Skip duplicates by name + size to avoid double-adding when user re-opens picker.
+      const dup = state.photos.some(p => p.name === f.name && p.size === f.size);
+      if (!dup) state.photos.push(f);
+    }
+    // Reset the native input so the user can pick more files later.
+    input.value = '';
+    renderPhotoList();
+  });
+  renderPhotoList();
+}
+
+function renderPhotoList() {
+  const list = document.getElementById('photo-list');
+  const status = document.getElementById('photo-status');
+  if (!list || !status) return;
+
+  list.innerHTML = state.photos.map((f, i) => {
+    const sizeMB = (f.size / (1024 * 1024)).toFixed(1);
+    return (
+      '<div class="photo-list-item">' +
+        '<span class="photo-list-item__name">' + escapeText(f.name) + '</span>' +
+        '<span class="photo-list-item__size">' + sizeMB + ' MB</span>' +
+        '<button type="button" class="photo-list-item__delete" aria-label="Remove" onclick="removePhoto(' + i + ')">&times;</button>' +
+      '</div>'
+    );
+  }).join('');
+
+  const total = state.photos.reduce((a, f) => a + f.size, 0);
+  const totalMB = (total / (1024 * 1024)).toFixed(1);
+  const limitMB = (MAX_PHOTOS_TOTAL_BYTES / (1024 * 1024)).toFixed(0);
+
+  if (state.photos.length === 0) {
+    status.textContent = '';
+    status.className = 'photo-status';
+  } else if (total > MAX_PHOTOS_TOTAL_BYTES) {
+    status.textContent = 'Total photos exceed ' + limitMB + ' MB (currently ' + totalMB + ' MB). Remove some to continue.';
+    status.className = 'photo-status photo-status--error';
+  } else {
+    status.textContent = state.photos.length + ' / ' + MAX_PHOTOS + ' photos · ' + totalMB + ' / ' + limitMB + ' MB';
+    status.className = 'photo-status';
+  }
+}
+
+function removePhoto(idx) {
+  state.photos.splice(idx, 1);
+  renderPhotoList();
+}
+
+function escapeText(s) {
+  const div = document.createElement('div');
+  div.textContent = String(s == null ? '' : s);
+  return div.innerHTML;
+}
+
+function photosTotalBytes() {
+  return state.photos.reduce((a, f) => a + f.size, 0);
+}
+
+// --- Field validation (keeps obvious garbage out without nagging real users) ---
+function isValidPhone(s) {
+  const digits = String(s || '').replace(/[^0-9]/g, '');
+  if (digits.length < 7 || digits.length > 15) return false;
+  if (/^(\d)\1+$/.test(digits)) return false; // all same digit
+  return true;
+}
+
+function isValidEmail(s) {
+  if (!s) return true; // optional field
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
+function flagInvalid(input, message) {
+  if (!input) return;
+  input.setCustomValidity(message);
+  input.reportValidity();
+}
+
+function clearInvalid(input) {
+  if (input) input.setCustomValidity('');
+}
 
 // --- Service Selection ---
 function selectService(service) {
   state.service = service;
   state.answers = {};
+  state.photos = [];
+  renderPhotoList();
 
   // Highlight selected button
   document.querySelectorAll('[data-step="service"] .estimate-option').forEach(b => {
@@ -308,12 +405,38 @@ function closeScheduleModal() {
 
 function submitContact(e) {
   e.preventDefault();
+
+  const nameInput  = document.getElementById('contact-name');
+  const phoneInput = document.getElementById('contact-phone');
+  const emailInput = document.getElementById('contact-email');
+  const townInput  = document.getElementById('contact-town');
+  const notesInput = document.getElementById('contact-notes');
+
+  // Validate phone + email before doing anything else.
+  if (!isValidPhone(phoneInput.value)) {
+    flagInvalid(phoneInput, 'Please enter a valid phone number we can call you back on.');
+    return;
+  }
+  clearInvalid(phoneInput);
+
+  if (!isValidEmail(emailInput.value)) {
+    flagInvalid(emailInput, 'Please enter a valid email address (or leave it blank).');
+    return;
+  }
+  clearInvalid(emailInput);
+
+  if (photosTotalBytes() > MAX_PHOTOS_TOTAL_BYTES) {
+    const status = document.getElementById('photo-status');
+    if (status) status.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
   state.contact = {
-    name:  document.getElementById('contact-name').value,
-    phone: document.getElementById('contact-phone').value,
-    email: document.getElementById('contact-email').value,
-    town:  document.getElementById('contact-town').value,
-    notes: document.getElementById('contact-notes').value,
+    name:  nameInput.value,
+    phone: phoneInput.value,
+    email: emailInput.value,
+    town:  townInput.value,
+    notes: notesInput.value,
   };
   state.price = calculateEstimate();
 
@@ -329,7 +452,7 @@ function submitContact(e) {
   };
 
   // Photos are read asynchronously (FileReader); submit without blocking the UI.
-  readPhotos(document.getElementById('contact-photos')).then(photos => {
+  readPhotos().then(photos => {
     postLead({ ...payloadBase, photos });
   });
 
@@ -337,12 +460,12 @@ function submitContact(e) {
   goToStep('result');
 }
 
-// Read up to 6 image files from a <input type="file"> as base64 data URLs.
-// Returns a Promise that resolves to an array of { name, mimeType, dataUrl, size }.
-function readPhotos(input) {
-  if (!input || !input.files || input.files.length === 0) return Promise.resolve([]);
-  const files = Array.from(input.files).slice(0, 6);
-  const reads = files.map(file => new Promise((resolve) => {
+// Read every File in state.photos as a base64 data URL. Resolves to an array of
+// { name, mimeType, dataUrl, size }. The selection UI already enforces count
+// and total-size limits, so this just does the encoding.
+function readPhotos() {
+  if (!state.photos.length) return Promise.resolve([]);
+  const reads = state.photos.map(file => new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = () => resolve({
       name: file.name,
@@ -358,10 +481,26 @@ function readPhotos(input) {
 
 function submitSchedule(e) {
   e.preventDefault();
+
+  const phoneInput = document.getElementById('sched-phone');
+  const emailInput = document.getElementById('sched-email');
+
+  if (!isValidPhone(phoneInput.value)) {
+    flagInvalid(phoneInput, 'Please enter a valid phone number we can call you back on.');
+    return;
+  }
+  clearInvalid(phoneInput);
+
+  if (!isValidEmail(emailInput.value)) {
+    flagInvalid(emailInput, 'Please enter a valid email address (or leave it blank).');
+    return;
+  }
+  clearInvalid(emailInput);
+
   const sched = {
     name:  document.getElementById('sched-name').value,
-    phone: document.getElementById('sched-phone').value,
-    email: document.getElementById('sched-email').value,
+    phone: phoneInput.value,
+    email: emailInput.value,
     time:  document.getElementById('sched-time').value,
     notes: document.getElementById('sched-notes').value,
   };
