@@ -9,7 +9,7 @@
 // Remove APPS_SCRIPT_URL_FITFO (and the second fetch below) once testing is complete.
 const APPS_SCRIPT_URL_FITFO   = 'https://script.google.com/macros/s/AKfycbz68dVyIGyruTPSofHei6UqcbkBuDZKhGybFLFjcowc2uCSIkDol4NWOJ0FOZdqlxOXpQ/exec';
 // Pine Point (Jason) — his deployed script, receives all live leads.
-const APPS_SCRIPT_URL_CLIENT  = 'https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnQhmGkENjpA8GT7xm3DXoqvQVxcMbsI86Db8hv3nD-Xw4jnUQiUP6nl7w_Zi3OTV6oovZJlPNemZ1mo5B4pEgh-sfqXapFj6Y2KtfwbG1aqsqJB5xS2HHIeaPgpfTiJf-hXjuJPAOEEdt3QNWDsMDb23hbpnXHfUb2ATRS0s2n1gmwOJFEywEE1bwlrPSX1IWj4dhRG6VByZLJeGXgThaGNyTgLkb2qMMYDfMU9NvprxlgqXo0LUdd4BpTl97O1lnwoPWv5L8RcnR9ykDPWN1OsKh7QTQ&lib=M8wI9rCXskNF7RT-YVeWVze31xGCKtLkC';
+const APPS_SCRIPT_URL_CLIENT  = 'https://script.google.com/macros/s/AKfycby5Ss1I9EUZP2e0ZuGGkP48JPDYIWjllVY7BadNjRpqiK2JHUyEDgzc_e5-VaVzosi6QQ/exec';
 // Convenience alias used in legacy references below — points to client during normal operation.
 const APPS_SCRIPT_URL = APPS_SCRIPT_URL_CLIENT;
 
