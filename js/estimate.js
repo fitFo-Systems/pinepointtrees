@@ -431,9 +431,23 @@ function formatPrice(amount) {
 function openScheduleModal() {
   const c = state.contact || {};
   const set = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = v; };
-  set('sched-name', c.name);
+  set('sched-name',  c.name);
   set('sched-phone', c.phone);
   set('sched-email', c.email);
+
+  // Reset contact method selection
+  document.querySelectorAll('.sched-method-btn').forEach(b => b.classList.remove('selected'));
+  const form = document.getElementById('scheduleForm');
+  if (form) delete form.dataset.contactMethod;
+  document.getElementById('sched-time-row').style.display = 'none';
+  document.getElementById('sched-time').value = '';
+  document.getElementById('sched-submit-btn').textContent = 'Schedule a Follow-Up';
+  document.getElementById('sched-email').required = false;
+
+  // Reset form / confirmation visibility
+  form.style.display = '';
+  document.getElementById('scheduleConfirmation').style.display = 'none';
+
   document.getElementById('scheduleModal').style.display = 'flex';
   document.body.style.overflow = 'hidden';
 }
@@ -441,6 +455,36 @@ function openScheduleModal() {
 function closeScheduleModal() {
   document.getElementById('scheduleModal').style.display = 'none';
   document.body.style.overflow = '';
+}
+
+function onSchedMethodSelect(method) {
+  // Highlight selected button
+  document.querySelectorAll('.sched-method-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.method === method);
+  });
+  // Store on form for submit to read
+  document.getElementById('scheduleForm').dataset.contactMethod = method;
+
+  // Show/hide time picker
+  const timeRow = document.getElementById('sched-time-row');
+  timeRow.style.display = method === 'phone_call' ? '' : 'none';
+  if (method !== 'phone_call') document.getElementById('sched-time').value = '';
+
+  // Email required only when email method selected
+  document.getElementById('sched-email').required = method === 'email';
+
+  // Clear any stale method error
+  const methodGroup = document.querySelector('.sched-method-group');
+  if (methodGroup) {
+    const err = methodGroup.parentElement.querySelector('.field-error');
+    if (err) err.textContent = '';
+  }
+
+  // Dynamic button label
+  const btn = document.getElementById('sched-submit-btn');
+  if (method === 'phone_call') btn.textContent = 'Schedule My Call';
+  else if (method === 'text')   btn.textContent = 'Request a Text Back';
+  else                          btn.textContent = 'Request an Email Back';
 }
 
 function submitContact(e) {
@@ -528,48 +572,95 @@ function readPhotos() {
 function submitSchedule(e) {
   e.preventDefault();
 
-  const phoneInput = document.getElementById('sched-phone');
-  const emailInput = document.getElementById('sched-email');
+  const form          = document.getElementById('scheduleForm');
+  const contactMethod = form.dataset.contactMethod || '';
+  const phoneInput    = document.getElementById('sched-phone');
+  const emailInput    = document.getElementById('sched-email');
 
+  // Contact method required
+  if (!contactMethod) {
+    const methodGroup = document.querySelector('.sched-method-group');
+    if (methodGroup) {
+      let err = methodGroup.parentElement.querySelector('.field-error');
+      if (!err) {
+        err = document.createElement('div');
+        err.className = 'field-error';
+        methodGroup.parentElement.appendChild(err);
+      }
+      err.textContent = 'Please select how you\'d like us to reach you.';
+      methodGroup.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return;
+  }
+
+  // Phone always required
   if (!isValidPhone(phoneInput.value)) {
-    showFieldError(phoneInput, 'Enter a 10-digit phone number we can call you back on.');
+    showFieldError(phoneInput, 'Enter a 10-digit phone number.');
     return;
   }
   clearFieldError(phoneInput);
 
-  if (!isValidEmail(emailInput.value)) {
+  // Email required + valid when email method; optional-but-valid otherwise
+  if (contactMethod === 'email') {
+    if (!emailInput.value || !isValidEmail(emailInput.value)) {
+      showFieldError(emailInput, 'Enter a valid email address so we can reach you.');
+      return;
+    }
+  } else if (emailInput.value && !isValidEmail(emailInput.value)) {
     showFieldError(emailInput, "That email doesn't look right. Double-check the @ and the domain, or leave it blank.");
     return;
   }
   clearFieldError(emailInput);
 
+  // Time required for phone call
+  if (contactMethod === 'phone_call') {
+    const timeSelect = document.getElementById('sched-time');
+    if (!timeSelect.value) {
+      showFieldError(timeSelect, 'Please select a preferred time for us to call.');
+      return;
+    }
+  }
+
   const sched = {
-    name:  document.getElementById('sched-name').value,
-    phone: phoneInput.value,
-    email: emailInput.value,
-    time:  document.getElementById('sched-time').value,
-    notes: document.getElementById('sched-notes').value,
+    name:          document.getElementById('sched-name').value,
+    phone:         phoneInput.value,
+    email:         emailInput.value,
+    time:          document.getElementById('sched-time').value,
+    notes:         document.getElementById('sched-notes').value,
+    contactMethod,
   };
 
   postLead({
     formType: 'schedule',
-    service: state.service,
-    answers: state.answers,
-    price: state.price || calculateEstimate(),
-    // Carry the ZIP captured during the estimate-contact step so the
-    // server can re-run the service-area check and pass validation.
+    service:  state.service,
+    answers:  state.answers,
+    price:    state.price || calculateEstimate(),
     contact: {
       name:  sched.name,
       phone: sched.phone,
       email: sched.email,
       zip:   (state.contact && state.contact.zip) || '',
     },
-    scheduledTime: sched.time,
-    scheduleNotes: sched.notes,
+    contactMethod:  sched.contactMethod,
+    scheduledTime:  sched.time,
+    scheduleNotes:  sched.notes,
     page: location.href
   });
 
-  document.getElementById('scheduleForm').style.display = 'none';
+  // Dynamic confirmation — show the contact detail they'll be reached on
+  const headline = document.getElementById('schedConfirmHeadline');
+  const detail   = document.getElementById('schedConfirmDetail');
+  if (headline) headline.textContent = 'Thank you for reaching out to Pine Point!';
+  if (detail) {
+    const reach = contactMethod === 'email'
+      ? 'email you at <strong>' + escapeText(sched.email) + '</strong>'
+      : 'reach you at <strong>' + escapeText(sched.phone) + '</strong>';
+    detail.innerHTML =
+      "We'll be in contact with you shortly to discuss.<br>" +
+      "<span style='color:var(--color-light-gray);font-size:0.85rem'>We'll " + reach + '.</span>';
+  }
+
+  form.style.display = 'none';
   document.getElementById('scheduleConfirmation').style.display = 'block';
 }
 

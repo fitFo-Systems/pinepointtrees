@@ -1680,6 +1680,36 @@ body.emergency-active .hero {
   gap: 10px;
 }
 
+/* Schedule modal — contact method selector */
+.sched-method-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 2px;
+}
+.sched-method-btn {
+  padding: 10px 8px;
+  background: var(--color-charcoal);
+  border: 2px solid var(--color-dark-gray);
+  border-radius: 4px;
+  color: var(--color-light-gray);
+  font-family: var(--font-family);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  text-align: center;
+}
+.sched-method-btn:hover {
+  border-color: var(--color-medium-gray);
+  color: var(--color-white);
+}
+.sched-method-btn.selected {
+  border-color: var(--color-green);
+  color: var(--color-white);
+  background: rgba(74, 144, 74, 0.12);
+}
+
 @media (max-width: 768px) {
   .modal--compact {
     padding: 20px 16px;

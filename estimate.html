@@ -403,7 +403,7 @@
     <div class="modal modal--compact">
       <button class="modal__close" onclick="closeScheduleModal()">&times;</button>
       <h3 class="modal__title">Schedule a Follow-Up</h3>
-      <p class="modal__subtitle">We'll call you to discuss your job and set up a free on-site visit.</p>
+      <p class="modal__subtitle">Tell us how to reach you and we'll be in touch to set up a free on-site visit.</p>
 
       <form class="lead-form" id="scheduleForm" onsubmit="submitSchedule(event)" style="gap: 10px;">
         <div class="form-row">
@@ -416,32 +416,38 @@
             <input type="tel" id="sched-phone" required>
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-group" style="margin-bottom:0">
-            <label for="sched-time">Best time *</label>
-            <select id="sched-time" required>
-              <option value="">When should we call?</option>
-              <option value="morning">Morning (8–12)</option>
-              <option value="afternoon">Afternoon (12–4)</option>
-              <option value="evening">Evening (4–7)</option>
-              <option value="weekend">Weekend</option>
-            </select>
+        <div class="form-group" style="margin-bottom:0">
+          <label for="sched-email">Email <span style="color:var(--color-medium-gray);font-weight:400">(optional)</span></label>
+          <input type="email" id="sched-email" placeholder="you@email.com">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label>How should we reach you? *</label>
+          <div class="sched-method-group">
+            <button type="button" class="sched-method-btn" data-method="email" onclick="onSchedMethodSelect('email')">Email</button>
+            <button type="button" class="sched-method-btn" data-method="text" onclick="onSchedMethodSelect('text')">Text</button>
+            <button type="button" class="sched-method-btn" data-method="phone_call" onclick="onSchedMethodSelect('phone_call')">Phone call</button>
           </div>
-          <div class="form-group" style="margin-bottom:0">
-            <label for="sched-email">Email <span style="color:var(--color-medium-gray);font-weight:400">(optional)</span></label>
-            <input type="email" id="sched-email" placeholder="you@email.com">
-          </div>
+        </div>
+        <div id="sched-time-row" class="form-group" style="display:none; margin-bottom:0">
+          <label for="sched-time">Best time to call *</label>
+          <select id="sched-time">
+            <option value="">When should we call?</option>
+            <option value="morning">Morning (8–12)</option>
+            <option value="afternoon">Afternoon (12–4)</option>
+            <option value="evening">Evening (4–7)</option>
+            <option value="weekend">Weekend</option>
+          </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label for="sched-notes">Quick note <span style="color:var(--color-medium-gray);font-weight:400">(optional)</span></label>
-          <input type="text" id="sched-notes" placeholder="Anything we should know before calling...">
+          <input type="text" id="sched-notes" placeholder="Anything we should know...">
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px; padding: 12px;">Schedule My Call</button>
+        <button type="submit" id="sched-submit-btn" class="btn btn-primary" style="width: 100%; margin-top: 8px; padding: 12px;">Schedule a Follow-Up</button>
       </form>
 
       <div id="scheduleConfirmation" style="display: none; text-align: center; padding: 20px 16px;">
-        <p style="color: var(--color-green); font-weight: 700; font-size: 1.125rem; margin-bottom: 6px;">You're on the list.</p>
-        <p style="color: var(--color-light-gray); font-size: 0.9rem;">We'll call during your preferred window.</p>
+        <p style="color: var(--color-green); font-weight: 700; font-size: 1.125rem; margin-bottom: 6px;" id="schedConfirmHeadline">You're on the list.</p>
+        <p style="color: var(--color-light-gray); font-size: 0.9rem;" id="schedConfirmDetail">We'll be in touch soon.</p>
         <p style="color: var(--color-light-gray); font-size: 0.9rem; margin-top: 4px;">Need us sooner? <a href="tel:+17742622145" style="color: var(--color-white); text-decoration: underline; white-space: nowrap;">(774)&nbsp;262-2145</a></p>
         <a href="index.html" class="btn btn-outline" style="margin-top: 18px; display: inline-block;">Back to homepage</a>
       </div>
