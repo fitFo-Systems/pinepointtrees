@@ -954,8 +954,21 @@ function sendHandoffEmail(data) {
   if (data.ok_count != null || data.issue_count != null) {
     lines.push('OK: ' + (data.ok_count || 0) + ', Issues: ' + (data.issue_count || 0) + ', Untested: ' + (data.untested_count || 0));
   }
+  const emailOpts = {};
+  if (data.invoice_attachments) {
+    try {
+      const files = JSON.parse(data.invoice_attachments);
+      if (Array.isArray(files) && files.length) {
+        emailOpts.attachments = files.map(f =>
+          Utilities.newBlob(Utilities.base64Decode(f.data_base64), f.mimeType || 'application/octet-stream', f.filename)
+        );
+      }
+    } catch (e) {
+      lines.push('(Note: invoice attachment decode failed — ' + String(e) + ')');
+    }
+  }
   try {
-    MailApp.sendEmail(HANDOFF_NOTIFY, subject, lines.join('\n') || '(empty body)');
+    MailApp.sendEmail(HANDOFF_NOTIFY, subject, lines.join('\n') || '(empty body)', emailOpts);
   } catch (e) {
     // Don't crash the request if email fails — POSTer doesn't need to know.
   }
