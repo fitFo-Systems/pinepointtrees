@@ -597,17 +597,33 @@ function sendCallbackEmail(d) {
   const p = d.price || {};
   const num = d.estimateNumber || '';
   const service = SERVICE_NAMES[d.service] || d.service || '';
-  const subject = 'Callback Requested - ' + (service ? service + ' ' : '') + (c.name || 'Pine Point');
+
+  // Heading + subject reflect how the customer wants to be reached
+  const method = d.contactMethod || 'phone_call';
+  const methodHeading = method === 'text'  ? 'Followup Text Requested'
+                      : method === 'email' ? 'Followup Email Requested'
+                      :                     'Callback Requested';
+  const subject = methodHeading + ' - ' + (service ? service + ' ' : '') + (c.name || 'Pine Point');
+
+  // Contact reach-back row: show phone for call/text, email for email method
+  const reachLabel  = method === 'email' ? 'Reply to'    : 'Call / text';
+  const reachValue  = method === 'email' ? emailLink(c.email) : phoneLink(c.phone);
+  const callerRows  = contactRows(c, d.areaCheck).concat([
+    ['Reach via', '<strong>' + escapeHtml(methodHeading) + '</strong>'],
+    [reachLabel,  reachValue],
+    // Best time only relevant for phone call
+    ...(method === 'phone_call'
+      ? [['Best time', '<strong>' + escapeHtml(d.scheduledTime || '(any)') + '</strong>']]
+      : [])
+  ]);
 
   const html = [
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;color:#222">',
-    '<h2 style="margin:0 0 4px;color:#2D5A27">Callback Requested</h2>',
+    '<h2 style="margin:0 0 4px;color:#2D5A27">' + escapeHtml(methodHeading) + '</h2>',
     num ? '<p style="margin:0 0 12px;font-size:13px;color:#444">Estimate #: <strong>' + escapeHtml(num) + '</strong></p>' : '<div style="height:12px"></div>',
     leadFollowupBanner(d),
     outsideAreaBanner(d.areaCheck),
-    htmlSection('Caller', contactRows(c, d.areaCheck).concat([
-      ['Best time', '<strong>' + escapeHtml(d.scheduledTime || '(any)') + '</strong>']
-    ])),
+    htmlSection('Caller', callerRows),
     htmlSection('Job', [
       ['Service', '<strong>' + escapeHtml(SERVICE_NAMES[d.service] || d.service || '') + '</strong>']
     ].concat(answerRows(d.service, d.answers))),

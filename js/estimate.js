@@ -443,6 +443,10 @@ function openScheduleModal() {
   document.getElementById('sched-time').value = '';
   document.getElementById('sched-submit-btn').textContent = 'Schedule a Follow-Up';
   document.getElementById('sched-email').required = false;
+  const optTag = document.getElementById('sched-email-optional');
+  const reqTag = document.getElementById('sched-email-required');
+  if (optTag) optTag.style.display = '';
+  if (reqTag) reqTag.style.display = 'none';
 
   // Reset form / confirmation visibility
   form.style.display = '';
@@ -470,8 +474,12 @@ function onSchedMethodSelect(method) {
   timeRow.style.display = method === 'phone_call' ? '' : 'none';
   if (method !== 'phone_call') document.getElementById('sched-time').value = '';
 
-  // Email required only when email method selected
+  // Email required only when email method selected — update label to match
   document.getElementById('sched-email').required = method === 'email';
+  const optionalTag = document.getElementById('sched-email-optional');
+  const requiredTag = document.getElementById('sched-email-required');
+  if (optionalTag) optionalTag.style.display = method === 'email' ? 'none' : '';
+  if (requiredTag) requiredTag.style.display = method === 'email' ? '' : 'none';
 
   // Clear any stale method error
   const methodGroup = document.querySelector('.sched-method-group');
