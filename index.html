@@ -322,6 +322,7 @@
         <button class="testimonials-nav__btn" id="galleryNext" aria-label="Next photos">&#9654;</button>
       </div>
       <script>
+        document.addEventListener('DOMContentLoaded', function () {
         (function () {
           var PER_PAGE = 6;
           var allPhotos = [];
@@ -402,6 +403,7 @@
             })
             .catch(function () { /* silent — grid stays empty */ });
         })();
+        }); // DOMContentLoaded
       </script>
     </div>
   </section>
