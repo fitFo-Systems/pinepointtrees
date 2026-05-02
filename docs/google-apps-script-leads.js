@@ -500,11 +500,12 @@ function processPendingLeads() {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return;
 
-  // Build the set of phone/email keys that scheduled a callback recently.
-  // A schedule POST landing on the server BEFORE its matching estimate_contact
-  // POST (race triggered by client-side photo encoding latency) leaves nothing
-  // for cancelPendingFor() to delete; this safety net catches that case.
-  const scheduledKeys = collectRecentScheduleKeys(ss, EMAIL_DELAY_MINUTES + 5);
+  // Check ALL schedule rows — no time limit. If someone's phone or email
+  // appears anywhere in Schedule Requests (regardless of when they scheduled),
+  // we never send a lead email for them. This covers the case where the person
+  // spends more than EMAIL_DELAY_MINUTES on the result screen before clicking
+  // "Schedule a Follow-Up" — the old time-bounded check would miss them.
+  const scheduledKeys = collectAllScheduleKeys(ss);
 
   const cutoff = new Date(Date.now() - EMAIL_DELAY_MINUTES * 60 * 1000);
   const rows = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
@@ -529,6 +530,29 @@ function processPendingLeads() {
     }
     sheet.deleteRow(i + 2);
   }
+}
+
+/**
+ * Returns a Set of all normalized phone and email keys that appear in the
+ * Schedule Requests sheet — no time filter. Used by processPendingLeads to
+ * ensure a lead email is never sent once someone has scheduled, regardless
+ * of whether they scheduled before or after the EMAIL_DELAY_MINUTES window.
+ */
+function collectAllScheduleKeys(ss) {
+  const sheet = ss.getSheetByName(SHEETS.schedule.name);
+  const keys = new Set();
+  if (!sheet) return keys;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return keys;
+  // Schedule Requests columns (1-indexed): 1=Estimate#, 2=Timestamp, 3=Name, 4=Phone, 5=Email
+  const rows = sheet.getRange(2, 1, lastRow - 1, 5).getValues();
+  for (const r of rows) {
+    const pk = normalizeKey(r[3]);
+    const ek = normalizeKey(r[4]);
+    if (pk) keys.add(pk);
+    if (ek) keys.add(ek);
+  }
+  return keys;
 }
 
 function collectRecentScheduleKeys(ss, minutesBack) {
