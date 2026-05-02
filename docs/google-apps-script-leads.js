@@ -443,12 +443,23 @@ function upsertSummary(ss, d, leadType) {
 // ============================================================
 
 function queueLeadEmail(ss, d) {
-  const sheet = getOrCreate(ss, SHEETS.pending);
   const c = d.contact || {};
+  const phoneKey = normalizeKey(c.phone);
+  const emailKey = normalizeKey(c.email);
+
+  // Guard: if this phone/email already appears in Schedule Requests, the
+  // customer scheduled before (or simultaneously with) submitting contact —
+  // the callback email will fire, so we must NOT also send a lead email.
+  const scheduledKeys = collectAllScheduleKeys(ss);
+  if ((phoneKey && scheduledKeys.has(phoneKey)) || (emailKey && scheduledKeys.has(emailKey))) {
+    return;
+  }
+
+  const sheet = getOrCreate(ss, SHEETS.pending);
   sheet.appendRow([
     new Date(),
-    normalizeKey(c.phone),
-    normalizeKey(c.email),
+    phoneKey,
+    emailKey,
     JSON.stringify(d)
   ]);
 }
