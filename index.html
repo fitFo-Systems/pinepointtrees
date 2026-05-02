@@ -547,9 +547,8 @@
             }
           }).addTo(map);
 
-          // Fit map to show all service towns, then nudge in one zoom level
-          map.fitBounds(bounds.getBounds().pad(0.05));
-          map.zoomIn(1);
+          // Fit map to show all service towns
+          map.fitBounds(bounds.getBounds().pad(0.02));
 
         });
     });
