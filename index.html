@@ -315,25 +315,93 @@
         <span class="section-label">Gallery</span>
         <h2>More of Our Work</h2>
       </div>
-      <div class="gallery-grid" id="galleryGrid">
-        <!-- Loaded dynamically from data/gallery.json -->
+      <div class="gallery-grid" id="galleryGrid"></div>
+      <div class="gallery-nav" id="galleryNav" style="display:none;">
+        <button class="testimonials-nav__btn" id="galleryPrev" aria-label="Previous photos" disabled>&#9664;</button>
+        <span class="testimonials-nav__counter" id="galleryCounter">1 / 1</span>
+        <button class="testimonials-nav__btn" id="galleryNext" aria-label="Next photos">&#9654;</button>
       </div>
       <script>
-        fetch('data/gallery.json')
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
+        (function () {
+          var PER_PAGE = 6;
+          var allPhotos = [];
+          var currentPage = 0;
+          var lbIndex = 0;
+
+          function escAttr(s) {
+            return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+          }
+
+          function renderPage() {
             var grid = document.getElementById('galleryGrid');
-            data.photos.forEach(function(photo) {
-              var item = document.createElement('div');
-              item.className = 'gallery-grid__item';
-              var img = document.createElement('img');
-              img.src = photo.src;
-              img.alt = photo.alt || '';
-              img.loading = 'lazy';
-              item.appendChild(img);
-              grid.appendChild(item);
-            });
+            var start = currentPage * PER_PAGE;
+            var slice = allPhotos.slice(start, start + PER_PAGE);
+            grid.innerHTML = slice.map(function (p, i) {
+              return '<div class="gallery-grid__item" onclick="galleryOpenLb(' + (start + i) + ')" style="cursor:pointer">' +
+                '<img src="' + escAttr(p.src) + '" alt="' + escAttr(p.alt) + '" loading="lazy">' +
+                '</div>';
+            }).join('');
+            var total = Math.ceil(allPhotos.length / PER_PAGE);
+            var nav = document.getElementById('galleryNav');
+            if (total > 1) {
+              nav.style.display = 'flex';
+              document.getElementById('galleryCounter').textContent = (currentPage + 1) + ' / ' + total;
+              document.getElementById('galleryPrev').disabled = currentPage === 0;
+              document.getElementById('galleryNext').disabled = currentPage === total - 1;
+            } else {
+              nav.style.display = 'none';
+            }
+          }
+
+          function updateLb() {
+            var p = allPhotos[lbIndex];
+            document.getElementById('lbImg').src = p.src;
+            document.getElementById('lbImg').alt = p.alt || '';
+            document.getElementById('lbCounter').textContent = (lbIndex + 1) + ' / ' + allPhotos.length;
+            document.getElementById('lbPrev').disabled = lbIndex === 0;
+            document.getElementById('lbNext').disabled = lbIndex === allPhotos.length - 1;
+          }
+
+          window.galleryOpenLb = function (idx) {
+            lbIndex = idx;
+            updateLb();
+            document.getElementById('galleryLightbox').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+          };
+
+          window.galleryCloseLb = function () {
+            document.getElementById('galleryLightbox').style.display = 'none';
+            document.body.style.overflow = '';
+          };
+
+          document.getElementById('lbClose').onclick = galleryCloseLb;
+          document.getElementById('lbPrev').onclick = function () { if (lbIndex > 0) { lbIndex--; updateLb(); } };
+          document.getElementById('lbNext').onclick = function () { if (lbIndex < allPhotos.length - 1) { lbIndex++; updateLb(); } };
+          document.getElementById('galleryLightbox').onclick = function (e) { if (e.target === this) galleryCloseLb(); };
+
+          document.getElementById('galleryPrev').onclick = function () {
+            if (currentPage > 0) { currentPage--; renderPage(); }
+          };
+          document.getElementById('galleryNext').onclick = function () {
+            if (currentPage < Math.ceil(allPhotos.length / PER_PAGE) - 1) { currentPage++; renderPage(); }
+          };
+
+          document.addEventListener('keydown', function (e) {
+            var lb = document.getElementById('galleryLightbox');
+            if (!lb || lb.style.display === 'none') return;
+            if (e.key === 'Escape') galleryCloseLb();
+            if (e.key === 'ArrowLeft'  && lbIndex > 0)                    { lbIndex--; updateLb(); }
+            if (e.key === 'ArrowRight' && lbIndex < allPhotos.length - 1) { lbIndex++; updateLb(); }
           });
+
+          fetch('data/gallery.json')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              allPhotos = data.photos || [];
+              renderPage();
+            })
+            .catch(function () { /* silent — grid stays empty */ });
+        })();
       </script>
     </div>
   </section>
@@ -489,5 +557,17 @@
   </style>
 
   <script src="js/main.js"></script>
+  <!-- Gallery Lightbox -->
+  <div id="galleryLightbox"
+       style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.93);z-index:2000;align-items:center;justify-content:center;flex-direction:column;">
+    <button id="lbClose" aria-label="Close" class="lb-btn lb-btn--close">&times;</button>
+    <div style="display:flex;align-items:center;gap:16px;width:100%;justify-content:center;padding:0 8px;">
+      <button id="lbPrev" aria-label="Previous photo" class="lb-btn lb-btn--arrow">&#9664;</button>
+      <img id="lbImg" src="" alt="" style="max-width:88vw;max-height:80vh;object-fit:contain;border-radius:6px;display:block;">
+      <button id="lbNext" aria-label="Next photo" class="lb-btn lb-btn--arrow">&#9654;</button>
+    </div>
+    <div id="lbCounter" style="color:#888;font-size:0.85rem;margin-top:14px;"></div>
+  </div>
+
 </body>
 </html>

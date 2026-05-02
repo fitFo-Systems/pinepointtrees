@@ -1680,6 +1680,40 @@ body.emergency-active .hero {
   gap: 10px;
 }
 
+/* Gallery nav (pagination) */
+.gallery-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+/* Lightbox buttons */
+.lb-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #fff;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  font-size: 1rem;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.lb-btn:hover:not(:disabled) { background: rgba(255,255,255,0.18); }
+.lb-btn:disabled { opacity: 0.25; cursor: not-allowed; }
+.lb-btn--close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  font-size: 1.5rem;
+  width: 40px;
+  height: 40px;
+}
+.lb-btn--arrow { font-size: 0.9rem; }
+
 /* Schedule modal — contact method selector */
 .sched-method-group {
   display: grid;
