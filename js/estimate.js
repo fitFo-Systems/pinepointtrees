@@ -4,10 +4,14 @@
    branching logic and targeted pricing.
    ============================================= */
 
-// Lead capture endpoint — Google Apps Script Web App URL.
-// Empty string = leads logged to console only (dev mode). Replace after deploy:
-// docs/LEAD-CAPTURE-SETUP.md
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz68dVyIGyruTPSofHei6UqcbkBuDZKhGybFLFjcowc2uCSIkDol4NWOJ0FOZdqlxOXpQ/exec';
+// Lead capture endpoints — Google Apps Script Web App URLs.
+// FITFO (Keith) — receives all leads during testing for QA sign-off.
+// Remove APPS_SCRIPT_URL_FITFO (and the second fetch below) once testing is complete.
+const APPS_SCRIPT_URL_FITFO   = 'https://script.google.com/macros/s/AKfycbz68dVyIGyruTPSofHei6UqcbkBuDZKhGybFLFjcowc2uCSIkDol4NWOJ0FOZdqlxOXpQ/exec';
+// Pine Point (Jason) — his deployed script, receives all live leads.
+const APPS_SCRIPT_URL_CLIENT  = 'https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnQhmGkENjpA8GT7xm3DXoqvQVxcMbsI86Db8hv3nD-Xw4jnUQiUP6nl7w_Zi3OTV6oovZJlPNemZ1mo5B4pEgh-sfqXapFj6Y2KtfwbG1aqsqJB5xS2HHIeaPgpfTiJf-hXjuJPAOEEdt3QNWDsMDb23hbpnXHfUb2ATRS0s2n1gmwOJFEywEE1bwlrPSX1IWj4dhRG6VByZLJeGXgThaGNyTgLkb2qMMYDfMU9NvprxlgqXo0LUdd4BpTl97O1lnwoPWv5L8RcnR9ykDPWN1OsKh7QTQ&lib=M8wI9rCXskNF7RT-YVeWVze31xGCKtLkC';
+// Convenience alias used in legacy references below — points to client during normal operation.
+const APPS_SCRIPT_URL = APPS_SCRIPT_URL_CLIENT;
 
 // --- Photo limits (kept under Apps Script's ~50 MB POST cap after base64 overhead) ---
 const MAX_PHOTOS = 6;
@@ -675,16 +679,18 @@ function submitSchedule(e) {
 // Fire-and-forget POST to the Apps Script endpoint. Never blocks the UX —
 // the user always sees the success state, even if the network request fails.
 function postLead(payload) {
-  if (!APPS_SCRIPT_URL) {
-    console.log('[lead] APPS_SCRIPT_URL not set, would have sent:', payload);
-    return;
+  const body = JSON.stringify(payload);
+  const opts = { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body };
+
+  // Fire to client endpoint (Jason) — always.
+  if (APPS_SCRIPT_URL_CLIENT) {
+    fetch(APPS_SCRIPT_URL_CLIENT, opts).catch(err => console.warn('[lead] client post failed', err));
   }
-  fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  }).catch(err => console.warn('[lead] post failed', err));
+
+  // Fire to FITFO endpoint (Keith) — QA sign-off only. Remove this block once testing is complete.
+  if (APPS_SCRIPT_URL_FITFO) {
+    fetch(APPS_SCRIPT_URL_FITFO, opts).catch(err => console.warn('[lead] fitfo post failed', err));
+  }
 }
 
 // Close modal on overlay click
