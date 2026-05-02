@@ -68,7 +68,7 @@ const SHEETS = {
 // Pine Point's service center (Leicester, MA) and operating radius.
 const SERVICE_CENTER_LAT = 42.2459;
 const SERVICE_CENTER_LNG = -71.9087;
-const SERVICE_RADIUS_MILES = 15;
+const SERVICE_RADIUS_MILES = 20;
 
 const PHOTO_FOLDER_NAME = 'Pine Point Lead Photos';
 
