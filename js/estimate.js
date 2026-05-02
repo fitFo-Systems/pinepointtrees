@@ -27,9 +27,9 @@ const state = {
 // --- Service Flow Definitions ---
 // Each service defines its ordered steps. The last step triggers estimate calculation.
 const serviceFlows = {
-  removal:      ['removal-1', 'removal-2', 'removal-3', 'removal-4'],
+  removal:      ['removal-1', 'removal-2', 'removal-3', 'removal-4', 'removal-5'],
   trimming:     ['trimming-1', 'trimming-2', 'trimming-3', 'trimming-4'],
-  lot_clearing: ['lot_clearing-1', 'lot_clearing-2', 'lot_clearing-3', 'lot_clearing-4']
+  lot_clearing: ['lot_clearing-1', 'lot_clearing-2', 'lot_clearing-3', 'lot_clearing-4', 'lot_clearing-5']
 };
 
 // --- Pricing Model ---
@@ -49,7 +49,7 @@ const pricing = {
   },
   // stump standalone removed — stump addon pricing is in removal.stumpAddon
   lot_clearing: {
-    base: { small: 1500, medium: 3500, large: 6000, xlarge: 10000 },
+    base: { small: 1725, medium: 4025, large: 6900, xlarge: 11500 },
     access: { easy: 1.0, limited: 1.2, none: 1.5 },
     density: { brush: 0.7, mixed: 1.0, heavy: 1.4 },
     endGoal: { build: 1.15, yard: 1.0, thin: 0.8 }
@@ -63,7 +63,8 @@ const labels = {
     treeHeight: { small: 'small', medium: 'medium', large: 'large', xlarge: 'very large' },
     hazards: { none: 'open area', house: 'near structure', powerlines: 'near power lines', both: 'near house & lines' },
     access: { easy: 'easy access', limited: 'limited access', none: 'difficult access' },
-    stumpRemoval: { yes: 'stumps included', no: 'trees only', not_sure: '' }
+    stumpRemoval: { yes: 'stumps included', no: 'trees only', not_sure: '' },
+    trunkWood: { yes: 'wood stays on property', no: 'wood hauled away' }
   },
   trimming: {
     treeCount: { '1': '1 tree', '2-3': '2-3 trees', '4-6': '4-6 trees', '7+': '7+ trees' },
@@ -75,7 +76,8 @@ const labels = {
     lotSize: { small: 'small area', medium: 'medium lot', large: 'large lot', xlarge: '1+ acres' },
     lotDensity: { brush: 'brush/small trees', mixed: 'mixed', heavy: 'dense woods' },
     access: { easy: 'easy access', limited: 'limited access', none: 'difficult access' },
-    endGoal: { build: 'construction prep', yard: 'yard/lawn', thin: 'selective thinning' }
+    endGoal: { build: 'construction prep', yard: 'yard/lawn', thin: 'selective thinning' },
+    trunkWood: { yes: 'wood stays on property', no: 'wood hauled away' }
   }
 };
 
@@ -330,9 +332,19 @@ function updateProgress() {
 // --- Calculate Estimate ---
 function showResult() {
   const estimate = calculateEstimate();
-  document.getElementById('priceLow').textContent = formatPrice(estimate.low);
-  document.getElementById('priceTypical').textContent = formatPrice(estimate.typical);
-  document.getElementById('priceHigh').textContent = formatPrice(estimate.high);
+  const priceRange = document.getElementById('priceRangeContainer');
+  const callForPrice = document.getElementById('callForPriceContainer');
+
+  if (estimate.callForPrice) {
+    if (priceRange)    priceRange.style.display = 'none';
+    if (callForPrice)  callForPrice.style.display = 'block';
+  } else {
+    if (priceRange)    priceRange.style.display = '';
+    if (callForPrice)  callForPrice.style.display = 'none';
+    document.getElementById('priceLow').textContent     = formatPrice(estimate.low);
+    document.getElementById('priceTypical').textContent = formatPrice(estimate.typical);
+    document.getElementById('priceHigh').textContent    = formatPrice(estimate.high);
+  }
 
   // Build breakdown
   const svcLabels = labels[state.service] || {};
@@ -382,6 +394,8 @@ function calculateEstimate() {
     }
 
     case 'lot_clearing': {
+      // 1+ acre jobs are priced on-site — too variable for an online estimate
+      if (a.lotSize === 'xlarge') return { callForPrice: true };
       const base = p.base[a.lotSize] || p.base.medium;
       const accessMult = p.access[a.access] || 1.0;
       const densityMult = p.density[a.lotDensity] || 1.0;

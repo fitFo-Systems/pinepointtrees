@@ -124,7 +124,19 @@
       <button class="estimate-back" onclick="goBack()">&larr; Back</button>
     </div>
 
-    <!-- Stump question removed — need Jason's input on how he handles stump requests -->
+    <div class="estimate-step" data-step="removal-5">
+      <div class="estimate-step__number">Tree Removal</div>
+      <h2 class="estimate-step__question">Will the trunk wood stay on the property?</h2>
+      <div class="estimate-options">
+        <button class="estimate-option" data-key="trunkWood" data-value="yes" onclick="answer(this, true)">
+          Yes — leave the wood <span class="estimate-option__desc">Logs and chunks remain on site</span>
+        </button>
+        <button class="estimate-option" data-key="trunkWood" data-value="no" onclick="answer(this, true)">
+          No — haul it away <span class="estimate-option__desc">We remove all wood from the property</span>
+        </button>
+      </div>
+      <button class="estimate-back" onclick="goBack()">&larr; Back</button>
+    </div>
 
     <!-- ==========================================
          TRIMMING / PRUNING PATH
@@ -259,14 +271,28 @@
       <div class="estimate-step__number">Lot Clearing</div>
       <h2 class="estimate-step__question">What's the end goal?</h2>
       <div class="estimate-options">
-        <button class="estimate-option" data-key="endGoal" data-value="build" onclick="answer(this, true)">
+        <button class="estimate-option" data-key="endGoal" data-value="build" onclick="answer(this)">
           Construction or building <span class="estimate-option__desc">Need it cleared to grade</span>
         </button>
-        <button class="estimate-option" data-key="endGoal" data-value="yard" onclick="answer(this, true)">
+        <button class="estimate-option" data-key="endGoal" data-value="yard" onclick="answer(this)">
           Yard or lawn <span class="estimate-option__desc">Want usable open space</span>
         </button>
-        <button class="estimate-option" data-key="endGoal" data-value="thin" onclick="answer(this, true)">
+        <button class="estimate-option" data-key="endGoal" data-value="thin" onclick="answer(this)">
           Selective thinning <span class="estimate-option__desc">Keep some trees, remove the rest</span>
+        </button>
+      </div>
+      <button class="estimate-back" onclick="goBack()">&larr; Back</button>
+    </div>
+
+    <div class="estimate-step" data-step="lot_clearing-5">
+      <div class="estimate-step__number">Lot Clearing</div>
+      <h2 class="estimate-step__question">Will the trunk wood stay on the property?</h2>
+      <div class="estimate-options">
+        <button class="estimate-option" data-key="trunkWood" data-value="yes" onclick="answer(this, true)">
+          Yes — leave the wood <span class="estimate-option__desc">Logs and chunks remain on site</span>
+        </button>
+        <button class="estimate-option" data-key="trunkWood" data-value="no" onclick="answer(this, true)">
+          No — haul it away <span class="estimate-option__desc">We remove all wood from the property</span>
         </button>
       </div>
       <button class="estimate-back" onclick="goBack()">&larr; Back</button>
@@ -326,22 +352,25 @@
         <span class="section-label">Your Estimate</span>
         <h2 class="estimate-step__question" style="margin-bottom: 8px;">Estimated Cost</h2>
 
-        <div class="estimate-result__range">
+        <div id="priceRangeContainer" class="estimate-result__range">
           <div class="estimate-tier">
             <div class="estimate-tier__label">Low</div>
             <div class="estimate-tier__price" id="priceLow">$—</div>
-            <div class="estimate-tier__note">If conditions are favorable</div>
           </div>
           <div class="estimate-tier estimate-tier--typical">
             <div class="estimate-tier__label">Typical</div>
             <div class="estimate-tier__price" id="priceTypical">$—</div>
-            <div class="estimate-tier__note">Most jobs like this land here</div>
           </div>
           <div class="estimate-tier">
             <div class="estimate-tier__label">High</div>
             <div class="estimate-tier__price" id="priceHigh">$—</div>
-            <div class="estimate-tier__note">If complications arise</div>
           </div>
+        </div>
+
+        <div id="callForPriceContainer" style="display:none; text-align:center; padding: 32px 0 16px;">
+          <div style="font-size: 1.1rem; color: var(--color-light-gray); margin-bottom: 8px;">Jobs over 1 acre vary too much for an online estimate.</div>
+          <div style="font-size: 2rem; font-weight: 700; color: var(--color-white);">Call for pricing</div>
+          <div style="margin-top: 12px;"><a href="tel:+17742622145" style="color: var(--color-green); font-size: 1.2rem; font-weight: 600;">(774) 262-2145</a></div>
         </div>
 
         <p class="estimate-result__breakdown" id="resultBreakdown"></p>
