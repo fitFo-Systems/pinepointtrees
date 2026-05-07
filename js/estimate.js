@@ -68,7 +68,7 @@ const labels = {
     hazards: { none: 'open area', house: 'near structure', powerlines: 'near power lines', both: 'near house & lines' },
     access: { easy: 'easy access', limited: 'limited access', none: 'difficult access' },
     stumpRemoval: { yes: 'stumps included', no: 'trees only', not_sure: '' },
-    trunkWood: { yes: 'wood stays on property', no: 'wood hauled away' }
+    trunkWood: { yes: 'wood stays', no: 'smaller wood chipped' }
   },
   trimming: {
     treeCount: { '1': '1 tree', '2-3': '2-3 trees', '4-6': '4-6 trees', '7+': '7+ trees' },
@@ -81,7 +81,7 @@ const labels = {
     lotDensity: { brush: 'brush/small trees', mixed: 'mixed', heavy: 'dense woods' },
     access: { easy: 'easy access', limited: 'limited access', none: 'difficult access' },
     endGoal: { build: 'construction prep', yard: 'yard/lawn', thin: 'selective thinning', as_is: 'leave as is' },
-    trunkWood: { yes: 'wood stays on property', no: 'wood hauled away' }
+    trunkWood: { yes: 'wood stays', no: 'smaller wood chipped' }
   }
 };
 
