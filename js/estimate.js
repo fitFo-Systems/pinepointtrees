@@ -46,7 +46,7 @@ const pricing = {
     stumpAddon: { small: 80, medium: 110, large: 140, xlarge: 180 }
   },
   trimming: {
-    base: { small: 150, medium: 280, large: 1400, xlarge: 2500 },
+    base: { small: 150, medium: 500, large: 1400, xlarge: 2500 },
     access: { easy: 1.0, limited: 1.15, none: 1.35 },
     pruneType: { overhang: 1.15, shaping: 1.0, deadwood: 1.1, clearance: 1.25 },
     volume: { '1': 1.0, '2-3': 1.8, '4-6': 3.0, '7+': 4.5 }
