@@ -9,9 +9,17 @@
    PDF / email come in Phase 2.
    ============================================= */
 
-// Apps Script endpoint — same one the rest of the site posts to.
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5Ss1I9EUZP2e0ZuGGkP48JPDYIWjllVY7BadNjRpqiK2JHUyEDgzc_e5-VaVzosi6QQ/exec';
-const APPS_SCRIPT_URL_FITFO = 'https://script.google.com/macros/s/AKfycbz68dVyIGyruTPSofHei6UqcbkBuDZKhGybFLFjcowc2uCSIkDol4NWOJ0FOZdqlxOXpQ/exec';
+// Apps Script endpoints. The crew tool reads/writes against ONE
+// endpoint (the JSONP read needs a single target). During QA we route
+// it through FITFO's deployment because that's where the new crew_*
+// handlers are live; once Jason redeploys his copy with the same
+// handlers, swap CREW_BACKEND_URL to APPS_SCRIPT_URL_CLIENT.
+const APPS_SCRIPT_URL_CLIENT = 'https://script.google.com/macros/s/AKfycby5Ss1I9EUZP2e0ZuGGkP48JPDYIWjllVY7BadNjRpqiK2JHUyEDgzc_e5-VaVzosi6QQ/exec';
+const APPS_SCRIPT_URL_FITFO  = 'https://script.google.com/macros/s/AKfycbz68dVyIGyruTPSofHei6UqcbkBuDZKhGybFLFjcowc2uCSIkDol4NWOJ0FOZdqlxOXpQ/exec';
+const CREW_BACKEND_URL = APPS_SCRIPT_URL_FITFO;
+// Mirror crew writes to the other endpoint as a fire-and-forget so
+// production data ends up in both Sheets once Jason is online.
+const CREW_MIRROR_URL  = APPS_SCRIPT_URL_CLIENT;
 
 const STORAGE_KEY_TOKEN = 'pinepoint.crew.token.v1';
 
@@ -568,7 +576,7 @@ function jsonp(params, timeoutMs) {
     const qs = Object.keys(params || {})
       .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k]))
       .join('&');
-    const url = APPS_SCRIPT_URL + '?' + qs + '&callback=' + cbName;
+    const url = CREW_BACKEND_URL + '?' + qs + '&callback=' + cbName;
     const script = document.createElement('script');
     let done = false;
     const timer = setTimeout(() => {
@@ -603,17 +611,19 @@ function jsonp(params, timeoutMs) {
 
 // POST with reply via fetch + text/plain (avoids CORS preflight).
 // Apps Script returns JSON; we read it directly from the response.
+// During QA the primary backend is FITFO; CREW_MIRROR_URL gets a
+// fire-and-forget copy so once Jason's deployment catches up, both
+// Sheets stay in sync.
 function postWithReply(payload) {
-  // The same payload is fire-and-forwarded to FITFO's QA endpoint.
-  if (APPS_SCRIPT_URL_FITFO) {
-    fetch(APPS_SCRIPT_URL_FITFO, {
+  if (CREW_MIRROR_URL && CREW_MIRROR_URL !== CREW_BACKEND_URL) {
+    fetch(CREW_MIRROR_URL, {
       method: 'POST',
       mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(payload)
     }).catch(() => {});
   }
-  return fetch(APPS_SCRIPT_URL, {
+  return fetch(CREW_BACKEND_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify(payload)
