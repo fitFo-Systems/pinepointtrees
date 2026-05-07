@@ -71,6 +71,16 @@
           <label>Street address *<input type="text" id="crew-address" placeholder="39 Prospect St, Auburn MA 01501" required></label>
         </fieldset>
 
+        <fieldset class="crew-fieldset crew-fieldset--readonly" id="crew-customer-said" style="display:none;">
+          <legend>What the customer said</legend>
+          <p class="crew-readonly-hint">For your reference. Not shown on the customer's quote or invoice.</p>
+          <div class="crew-readonly-rows" id="crew-customer-said-rows"></div>
+          <div class="crew-readonly-notes" id="crew-customer-said-notes" style="display:none;">
+            <div class="crew-readonly-notes__label">Their note</div>
+            <div class="crew-readonly-notes__body" id="crew-customer-said-notes-body"></div>
+          </div>
+        </fieldset>
+
         <fieldset class="crew-fieldset">
           <legend>Job</legend>
           <label>Service<select id="crew-service">

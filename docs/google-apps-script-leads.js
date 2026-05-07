@@ -1060,8 +1060,10 @@ function listCrewLeads(ss, filter) {
   const lastRow = summary.getLastRow();
   if (lastRow < 2) return [];
 
-  // Pull all summary rows: 9 columns (Estimate #, Name, Phone, Email, ZIP, Lead Type, Job Type, Estimate Range, Address)
-  const rows = summary.getRange(2, 1, lastRow - 1, 9).getValues();
+  // Use getDisplayValues so leading-zero ZIPs survive (getValues turns
+  // "01524" into the number 1524). Belt-and-suspenders: normalizeZip
+  // pads any short numeric ZIPs after the read.
+  const rows = summary.getRange(2, 1, lastRow - 1, 9).getDisplayValues();
 
   // Pull the Quotes tab to know which leads already have a Quote/Invoice in motion
   const quoteStatusByEst = readQuoteStatusByEstimate(ss);
@@ -1077,7 +1079,7 @@ function listCrewLeads(ss, filter) {
       name: r[1] || '',
       phone: r[2] || '',
       email: r[3] || '',
-      zip: r[4] || '',
+      zip: normalizeZip(r[4]),
       leadType: r[5] || '',
       jobType: r[6] || '',
       estimateRange: r[7] || '',
@@ -1086,6 +1088,20 @@ function listCrewLeads(ss, filter) {
     });
   }
   return out;
+}
+
+/**
+ * Pads short numeric ZIPs back to 5 digits. Sheets coerces "01524"
+ * into a number (1524), which loses the leading zero. Anything else
+ * (full 5-digit ZIPs, ZIP+4 like 01524-1234, or already-formatted
+ * strings) passes through.
+ */
+function normalizeZip(z) {
+  if (z == null) return '';
+  const s = String(z).trim();
+  if (!s) return '';
+  if (/^\d{1,4}$/.test(s)) return s.padStart(5, '0');
+  return s;
 }
 
 /**
@@ -1126,16 +1142,16 @@ function getCrewLead(ss, estimateNumber) {
     leadSource: ''
   };
 
-  // Try Estimate Leads first (has full answers + price range)
+  // Try Estimate Leads first (has full answers + price range).
+  // getDisplayValues so leading-zero ZIPs etc. survive Sheet coercion.
   const leads = ss.getSheetByName(SHEETS.estimate_contact.name);
   if (leads && leads.getLastRow() > 1) {
-    const headers = leads.getRange(1, 1, 1, leads.getLastColumn()).getValues()[0];
-    const rows = leads.getRange(2, 1, leads.getLastRow() - 1, leads.getLastColumn()).getValues();
+    const rows = leads.getRange(2, 1, leads.getLastRow() - 1, leads.getLastColumn()).getDisplayValues();
     for (let i = rows.length - 1; i >= 0; i--) {
       if (rows[i][0] === estimateNumber) {
         const row = rows[i];
         out.contact = {
-          name:  row[2] || '', phone: row[3] || '', email: row[4] || '', zip: row[5] || ''
+          name:  row[2] || '', phone: row[3] || '', email: row[4] || '', zip: normalizeZip(row[5])
         };
         out.service = row[10] || '';
         out.answers = {
@@ -1164,13 +1180,13 @@ function getCrewLead(ss, estimateNumber) {
   // Fall back / overlay with All Leads (carries Address)
   const summary = ss.getSheetByName(SHEETS.summary.name);
   if (summary && summary.getLastRow() > 1) {
-    const rows = summary.getRange(2, 1, summary.getLastRow() - 1, 9).getValues();
+    const rows = summary.getRange(2, 1, summary.getLastRow() - 1, 9).getDisplayValues();
     for (let i = rows.length - 1; i >= 0; i--) {
       if (rows[i][0] === estimateNumber) {
         if (!out.contact.name)  out.contact.name  = rows[i][1] || '';
         if (!out.contact.phone) out.contact.phone = rows[i][2] || '';
         if (!out.contact.email) out.contact.email = rows[i][3] || '';
-        if (!out.contact.zip)   out.contact.zip   = rows[i][4] || '';
+        if (!out.contact.zip)   out.contact.zip   = normalizeZip(rows[i][4]);
         out.contact.address = rows[i][8] || '';
         out.leadType = rows[i][5] || '';
         out.jobType  = rows[i][6] || '';

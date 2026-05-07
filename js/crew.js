@@ -47,6 +47,35 @@ const SERVICE_LABELS = {
   other: 'Other'
 };
 
+// Maps for translating the customer's submitted estimator answers
+// into human-readable strings on the read-only "What the customer
+// said" panel. Keys mirror the values stored on the Estimate Leads
+// sheet (and js/estimate.js's labels object).
+const ANSWER_LABELS = {
+  treeCount:  { '1': '1 tree', '2-3': '2–3 trees', '4-6': '4–6 trees', '7+': '7 or more trees' },
+  treeHeight: { small: 'Small (<25 ft)', medium: 'Medium (25–50 ft)', large: 'Large (50–75 ft)', xlarge: 'Very large (75+ ft)' },
+  hazards:    { none: 'Open area', house: 'Near structure', powerlines: 'Near power lines', both: 'Near structure and lines' },
+  access:     { easy: 'Easy access', limited: 'Tight but possible', none: 'Difficult — manual carry' },
+  pruneType:  { overhang: 'Branches over house / driveway', shaping: 'General shaping or thinning', deadwood: 'Dead or dangerous limbs', clearance: 'Clearance from lines / fence / structure' },
+  lotSize:    { small: 'Small area (<1/4 acre)', medium: 'Medium (1/4–1/2 acre)', large: 'Large (1/2–1 acre)', xlarge: '1+ acres' },
+  lotDensity: { brush: 'Brush + small trees', mixed: 'Mixed', heavy: 'Dense woods + large trees' },
+  endGoal:    { build: 'Construction prep', yard: 'Yard or lawn finish', thin: 'Selective thinning', as_is: 'Leave as is (no finishing)' },
+  trunkWood:  { yes: 'Wood stays on property', no: 'Smaller wood chipped, 9 inch+ stays' }
+};
+
+// Order of fields to show under "What the customer said" per service
+// type. Customer answers we don't have nice labels for fall through.
+const ANSWER_ORDER = {
+  removal:      ['treeCount', 'treeHeight', 'hazards', 'access', 'trunkWood'],
+  trimming:     ['treeCount', 'treeHeight', 'pruneType', 'access'],
+  lot_clearing: ['lotSize',   'lotDensity', 'access',    'endGoal', 'trunkWood']
+};
+const ANSWER_FIELD_LABELS = {
+  treeCount: 'Tree count', treeHeight: 'Tree height', hazards: 'Hazards', access: 'Truck access',
+  pruneType: 'Prune type', lotSize: 'Lot size', lotDensity: 'Density', endGoal: 'End goal',
+  trunkWood: 'Wood handling'
+};
+
 const state = {
   token: null,
   filter: 'open',
@@ -215,7 +244,78 @@ function wireEditView() {
   });
 
   // Re-draft description whenever trees / service change (only if user hasn't customized).
-  document.getElementById('crew-service').addEventListener('change', maybeRedraftDescription);
+  document.getElementById('crew-service').addEventListener('change', () => {
+    updateTreesVisibility();
+    maybeRedraftDescription();
+  });
+}
+
+/**
+ * Trees grid is hidden for lot clearing — there's no per-tree
+ * tracking happening; the job is by area + density + end goal. Crew
+ * can still type a description; the auto-draft uses lot vocabulary.
+ */
+function updateTreesVisibility() {
+  const treesEl = document.getElementById('crew-trees');
+  const service = document.getElementById('crew-service').value;
+  treesEl.style.display = (service === 'lot_clearing') ? 'none' : '';
+}
+
+/**
+ * Renders the "What the customer said" read-only panel. Hidden for
+ * manual leads (no customer-side data). Only shows answers/notes —
+ * never appears on the customer's quote/invoice.
+ */
+function renderCustomerSaid(lead) {
+  const wrap = document.getElementById('crew-customer-said');
+  const rowsEl = document.getElementById('crew-customer-said-rows');
+  const notesWrap = document.getElementById('crew-customer-said-notes');
+  const notesBody = document.getElementById('crew-customer-said-notes-body');
+
+  // No data to show? Hide entirely.
+  const isEstimateLead = lead && lead.leadSource === 'estimate';
+  const hasNotes = !!(lead && lead.notes);
+  const hasAnswers = lead && lead.answers && Object.values(lead.answers).some(v => v);
+  if (!isEstimateLead && !hasNotes && !hasAnswers) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+
+  const rows = [];
+  // Service the customer picked
+  if (lead.service) {
+    rows.push({ label: 'Service', value: SERVICE_LABELS[lead.service] || lead.service });
+  }
+  // Customer's answers in the order that fits their service path
+  const order = ANSWER_ORDER[lead.service] || [];
+  order.forEach(key => {
+    const v = (lead.answers || {})[key];
+    if (!v) return;
+    const label = ANSWER_FIELD_LABELS[key] || key;
+    const human = (ANSWER_LABELS[key] && ANSWER_LABELS[key][v]) || v;
+    rows.push({ label, value: human });
+  });
+  // Customer's price range (what we showed them)
+  const ce = lead.customerEstimate || {};
+  if (ce.low || ce.typical || ce.high) {
+    rows.push({
+      label: 'Price they saw',
+      value: 'Low $' + (ce.low || '?') + ' · Typical $' + (ce.typical || '?') + ' · High $' + (ce.high || '?')
+    });
+  }
+
+  rowsEl.innerHTML = rows.map(r =>
+    '<div class="crew-readonly-row"><div class="crew-readonly-row__label">' + escapeText(r.label) + '</div>' +
+    '<div class="crew-readonly-row__value">' + escapeText(r.value) + '</div></div>'
+  ).join('');
+
+  if (hasNotes) {
+    notesWrap.style.display = '';
+    notesBody.textContent = lead.notes;
+  } else {
+    notesWrap.style.display = 'none';
+  }
 }
 
 function openLead(estimateNumber) {
@@ -286,11 +386,15 @@ function hydrateEditForm(lead) {
   // Service
   document.getElementById('crew-service').value = (q && q.service) || lead.service || '';
 
+  // What the customer said — read-only panel, only when there's something to show.
+  renderCustomerSaid(lead);
+
   // Trees: from existing draft, or seed one blank row
   state.trees = (q && Array.isArray(q.trees) && q.trees.length)
     ? q.trees.map(t => ({ species: t.species || '', count: Number(t.count) || 1, size: t.size || 'medium', speciesOther: t.speciesOther || '' }))
     : [{ species: '', count: 1, size: 'medium', speciesOther: '' }];
   renderTreeRows();
+  updateTreesVisibility();
 
   // Description
   const descEl = document.getElementById('crew-description');
@@ -335,16 +439,18 @@ function renderTreeRows() {
   const wrap = document.getElementById('crew-trees-rows');
   wrap.innerHTML = state.trees.map((t, i) => `
     <div class="crew-tree-row" data-idx="${i}">
-      <select class="crew-tree-row__species" data-field="species">
-        <option value="">— species —</option>
-        ${SPECIES_OPTIONS.map(o => `<option value="${o.value}" ${t.species === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
-      </select>
-      <input type="text" class="crew-tree-row__other" data-field="speciesOther" placeholder="Other species" value="${escapeAttr(t.speciesOther || '')}" ${t.species === 'other' ? '' : 'style="display:none"'}>
-      <input type="number" class="crew-tree-row__count" data-field="count" min="1" step="1" value="${Number(t.count) || 1}">
-      <select class="crew-tree-row__size" data-field="size">
-        ${SIZE_OPTIONS.map(o => `<option value="${o.value}" ${t.size === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
-      </select>
-      <button type="button" class="crew-tree-row__remove" data-idx="${i}" aria-label="Remove tree">×</button>
+      <div class="crew-tree-row__main">
+        <select class="crew-tree-row__species" data-field="species">
+          <option value="">— species —</option>
+          ${SPECIES_OPTIONS.map(o => `<option value="${o.value}" ${t.species === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>
+        <input type="number" class="crew-tree-row__count" data-field="count" min="1" step="1" value="${Number(t.count) || 1}">
+        <select class="crew-tree-row__size" data-field="size">
+          ${SIZE_OPTIONS.map(o => `<option value="${o.value}" ${t.size === o.value ? 'selected' : ''}>${o.label}</option>`).join('')}
+        </select>
+        <button type="button" class="crew-tree-row__remove" data-idx="${i}" aria-label="Remove tree">×</button>
+      </div>
+      <input type="text" class="crew-tree-row__other" data-field="speciesOther" placeholder="Other species (e.g. cherry, locust)" value="${escapeAttr(t.speciesOther || '')}" ${t.species === 'other' ? '' : 'style="display:none"'}>
     </div>
   `).join('');
 
@@ -357,7 +463,6 @@ function renderTreeRows() {
         if (field === 'count') value = Math.max(1, parseInt(value, 10) || 1);
         state.trees[idx][field] = value;
         if (field === 'species') {
-          // Toggle the "other" text field visibility
           const otherEl = row.querySelector('[data-field="speciesOther"]');
           if (otherEl) otherEl.style.display = (value === 'other') ? '' : 'none';
           if (value !== 'other') state.trees[idx].speciesOther = '';
