@@ -46,7 +46,7 @@ const pricing = {
     stumpAddon: { small: 80, medium: 110, large: 140, xlarge: 180 }
   },
   trimming: {
-    base: { small: 150, medium: 280, large: 450, xlarge: 600 },
+    base: { small: 150, medium: 280, large: 1400, xlarge: 2500 },
     access: { easy: 1.0, limited: 1.15, none: 1.35 },
     pruneType: { overhang: 1.15, shaping: 1.0, deadwood: 1.1, clearance: 1.25 },
     volume: { '1': 1.0, '2-3': 1.8, '4-6': 3.0, '7+': 4.5 }
@@ -398,8 +398,13 @@ function calculateEstimate() {
     }
 
     case 'lot_clearing': {
-      // 1+ acre jobs are priced on-site — too variable for an online estimate
+      // 1+ acre jobs are priced on-site
       if (a.lotSize === 'xlarge') return { callForPrice: true };
+      // Yard or lawn finish (loam, seed, straw) only gets an instant estimate on small areas;
+      // medium and large yard jobs vary too much to price online.
+      if (a.endGoal === 'yard' && (a.lotSize === 'medium' || a.lotSize === 'large')) {
+        return { callForPrice: true };
+      }
       const base = p.base[a.lotSize] || p.base.medium;
       const accessMult = p.access[a.access] || 1.0;
       const densityMult = p.density[a.lotDensity] || 1.0;
@@ -409,22 +414,42 @@ function calculateEstimate() {
     }
   }
 
-  // Apply $500 minimum floor — ensure differentiation between tiers
-  const MIN_ESTIMATE = 500;
-  let low = Math.round(total * 0.80);
-  let typical = Math.round(total);
-  let high = Math.round(total * 1.25);
+  let low = total * 0.80;
+  let typical = total;
+  let high = total * 1.25;
 
-  // If the calculated total falls below minimum, set floor with spread
-  if (typical < MIN_ESTIMATE) {
-    low = MIN_ESTIMATE;
-    typical = Math.round(MIN_ESTIMATE * 1.15);  // $575
-    high = Math.round(MIN_ESTIMATE * 1.35);     // $675
-  } else if (low < MIN_ESTIMATE) {
-    low = MIN_ESTIMATE;
+  // Yard or lawn small lot: flat add-on for loam, seed, and straw materials.
+  // Tier-specific bumps so high keeps a buffer above typical.
+  if (svc === 'lot_clearing' && a.endGoal === 'yard' && a.lotSize === 'small') {
+    low += 2500;
+    typical += 2500;
+    high += 3000;
   }
 
+  // Per-service floor on the Low tier. Trimming has a higher floor
+  // (Jason: jobs under ~$1k are usually done opportunistically).
+  const lowFloor = svc === 'trimming' ? 750 : 500;
+  if (low < lowFloor) {
+    // Scale typical and high proportionally so the natural spread is preserved
+    const ratio = lowFloor / Math.max(low, 1);
+    low = lowFloor;
+    typical = typical * ratio;
+    high = high * ratio;
+  }
+
+  low = roundTo50(low);
+  typical = roundTo50(typical);
+  high = roundTo50(high);
+
+  // Enforce strict ordering: low < typical < high.
+  if (typical <= low) typical = low + 50;
+  if (high <= typical) high = typical + 50;
+
   return { low, typical, high };
+}
+
+function roundTo50(n) {
+  return Math.round(n / 50) * 50;
 }
 
 function formatPrice(amount) {
