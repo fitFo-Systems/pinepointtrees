@@ -36,7 +36,7 @@ const SHEETS = {
     name: 'All Leads',
     headers: [
       'Estimate #', 'Name', 'Phone', 'Email', 'ZIP',
-      'Lead Type', 'Job Type', 'Estimate Range'
+      'Lead Type', 'Job Type', 'Estimate Range', 'Address'
     ]
   },
   estimate_contact: {
@@ -70,6 +70,17 @@ const SHEETS = {
       'Timestamp', 'Name', 'Phone', 'Email', 'ZIP',
       'City', 'State', 'Distance (mi)', 'Outside Area',
       'Product', 'Wood Mix', 'Notes', 'Page'
+    ]
+  },
+  quotes: {
+    name: 'Quotes',
+    headers: [
+      'Quote #', 'Estimate #', 'Status',
+      'Customer Name', 'Address', 'Phone', 'Email', 'ZIP',
+      'Service', 'Trees JSON', 'Description', 'Total',
+      'Customer Est. Low', 'Customer Est. Typical', 'Customer Est. High',
+      'Created At', 'Sent At', 'Completed At', 'Invoiced At',
+      'Created By', 'Notes'
     ]
   }
 };
@@ -184,6 +195,12 @@ function doPost(e) {
       removeEstimateRow(ss, data.estimateNumber);
       upsertSummary(ss, data, 'Callback');
       sendCallbackEmail(data);
+    } else if (data.formType === 'crew_save_quote') {
+      if (!isCrewAuthorized(data.token)) return jsonResponse({ error: 'unauthorized' });
+      return jsonResponse(saveCrewQuote(ss, data));
+    } else if (data.formType === 'crew_create_lead') {
+      if (!isCrewAuthorized(data.token)) return jsonResponse({ error: 'unauthorized' });
+      return jsonResponse(createCrewLead(ss, data));
     } else if (data.formType === 'wood_signup') {
       if (!isValidContact(data.contact, data.formType)) {
         return jsonResponse({ error: 'invalid contact' });
@@ -362,8 +379,62 @@ function haversineMiles(lat1, lng1, lat2, lng2) {
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
-function doGet() {
-  return jsonResponse({ status: 'ready' });
+/**
+ * GET handler. Default route returns a tiny status payload (used as
+ * a smoke test). The /crew tool reads via JSONP — pass action=crew_*
+ * plus the shared token + a callback name to get JSON wrapped as JS
+ * the browser can load via a <script> tag (works around CORS, since
+ * Apps Script doesn't send cross-origin headers on raw fetch).
+ */
+function doGet(e) {
+  const params = (e && e.parameter) || {};
+  const action = params.action || '';
+  const callback = params.callback || '';
+
+  function respond(obj) {
+    const text = JSON.stringify(obj);
+    if (callback) {
+      // JSONP — wrap in callback invocation. Sanitize the callback
+      // name to letters/digits/underscores only so a malicious URL
+      // can't inject arbitrary JS.
+      const safe = String(callback).replace(/[^a-zA-Z0-9_]/g, '');
+      const fn = safe || 'callback';
+      return ContentService.createTextOutput(fn + '(' + text + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(text)
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    if (!action) return respond({ status: 'ready' });
+
+    if (action === 'crew_list' || action === 'crew_get') {
+      if (!isCrewAuthorized(params.token)) {
+        return respond({ error: 'unauthorized' });
+      }
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      if (action === 'crew_list') {
+        return respond({ leads: listCrewLeads(ss, params.filter || 'open') });
+      }
+      return respond({ lead: getCrewLead(ss, params.id) });
+    }
+
+    return respond({ error: 'unknown action: ' + action });
+  } catch (err) {
+    return respond({ error: String(err) });
+  }
+}
+
+/**
+ * Token gate for the /crew tool. The shared token lives in
+ * ScriptProperties under crew_access_token — set it once via
+ * installCrewToken() (see end of file).
+ */
+function isCrewAuthorized(token) {
+  if (!token) return false;
+  const stored = PropertiesService.getScriptProperties().getProperty('crew_access_token');
+  return Boolean(stored) && String(token) === String(stored);
 }
 
 // ============================================================
@@ -431,28 +502,30 @@ function upsertSummary(ss, d, leadType) {
   const p = d.price || {};
   const range = (p.low && p.high) ? '$' + p.low + '–$' + p.high : '';
   const jobType = SERVICE_NAMES[d.service] || d.service || '';
-  const row = [
-    d.estimateNumber,
-    c.name || '',
-    c.phone || '',
-    c.email || '',
-    c.zip || '',
-    leadType,
-    jobType,
-    range
-  ];
+  // Address is preserved across updates — if the row already exists
+  // and has a stored address, don't blow it away with an empty string
+  // from a contact that didn't carry one (e.g. a schedule POST after
+  // the crew tool already saved an address).
+  let address = c.address || '';
 
   const lastRow = sheet.getLastRow();
   if (lastRow >= 2) {
     const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
     for (let i = 0; i < ids.length; i++) {
       if (ids[i][0] === d.estimateNumber) {
+        if (!address) {
+          // Preserve existing address (column 9 = index 8)
+          const existingRow = sheet.getRange(i + 2, 1, 1, 9).getValues()[0];
+          address = existingRow[8] || '';
+        }
+        const row = [d.estimateNumber, c.name || '', c.phone || '', c.email || '', c.zip || '', leadType, jobType, range, address];
         sheet.getRange(i + 2, 1, 1, row.length).setValues([row]);
         return;
       }
     }
   }
-  sheet.appendRow(row);
+  const newRow = [d.estimateNumber, c.name || '', c.phone || '', c.email || '', c.zip || '', leadType, jobType, range, address];
+  sheet.appendRow(newRow);
 }
 
 // ============================================================
@@ -972,6 +1045,334 @@ function getOrCreate(ss, def) {
  * inbox regardless of which Google account this script is deployed
  * under.
  */
+// ============================================================
+// /crew tool — internal estimate confirmation + quote tracking
+// ============================================================
+
+/**
+ * Returns a list of leads for the crew tool. Reads from the All Leads
+ * summary tab (one row per Estimate #). Filter "open" hides anything
+ * already moved to Job Done / Invoiced via the Quotes tab.
+ */
+function listCrewLeads(ss, filter) {
+  const summary = ss.getSheetByName(SHEETS.summary.name);
+  if (!summary) return [];
+  const lastRow = summary.getLastRow();
+  if (lastRow < 2) return [];
+
+  // Pull all summary rows: 9 columns (Estimate #, Name, Phone, Email, ZIP, Lead Type, Job Type, Estimate Range, Address)
+  const rows = summary.getRange(2, 1, lastRow - 1, 9).getValues();
+
+  // Pull the Quotes tab to know which leads already have a Quote/Invoice in motion
+  const quoteStatusByEst = readQuoteStatusByEstimate(ss);
+
+  const out = [];
+  for (let i = rows.length - 1; i >= 0; i--) {  // newest first (rows are appended)
+    const r = rows[i];
+    if (!r[0]) continue;
+    const status = quoteStatusByEst[r[0]] || 'New';
+    if (filter === 'open' && (status === 'Invoiced' || status === 'Job Done')) continue;
+    out.push({
+      estimateNumber: r[0],
+      name: r[1] || '',
+      phone: r[2] || '',
+      email: r[3] || '',
+      zip: r[4] || '',
+      leadType: r[5] || '',
+      jobType: r[6] || '',
+      estimateRange: r[7] || '',
+      address: r[8] || '',
+      status: status
+    });
+  }
+  return out;
+}
+
+/**
+ * Build a map of Estimate # -> latest Quote status. If a customer has
+ * multiple quotes (rare), the most recent wins.
+ */
+function readQuoteStatusByEstimate(ss) {
+  const sheet = ss.getSheetByName(SHEETS.quotes.name);
+  if (!sheet) return {};
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {};
+  // Columns: Quote # (1), Estimate # (2), Status (3) ...
+  const data = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+  const out = {};
+  for (let i = 0; i < data.length; i++) {
+    const est = data[i][1];
+    const status = data[i][2];
+    if (est) out[est] = status || 'Draft';
+  }
+  return out;
+}
+
+/**
+ * Returns full lead detail by Estimate # — pulls customer, service,
+ * answers, the price range we showed them, address, and any existing
+ * Quote draft so the crew can resume editing.
+ */
+function getCrewLead(ss, estimateNumber) {
+  if (!estimateNumber) return null;
+  const out = {
+    estimateNumber: estimateNumber,
+    contact: {},
+    service: '',
+    answers: {},
+    customerEstimate: { low: '', typical: '', high: '' },
+    photoLinks: [],
+    quote: null,  // existing draft if any
+    leadSource: ''
+  };
+
+  // Try Estimate Leads first (has full answers + price range)
+  const leads = ss.getSheetByName(SHEETS.estimate_contact.name);
+  if (leads && leads.getLastRow() > 1) {
+    const headers = leads.getRange(1, 1, 1, leads.getLastColumn()).getValues()[0];
+    const rows = leads.getRange(2, 1, leads.getLastRow() - 1, leads.getLastColumn()).getValues();
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (rows[i][0] === estimateNumber) {
+        const row = rows[i];
+        out.contact = {
+          name:  row[2] || '', phone: row[3] || '', email: row[4] || '', zip: row[5] || ''
+        };
+        out.service = row[10] || '';
+        out.answers = {
+          treeCount:   row[11] || '',
+          treeHeight:  row[12] || '',
+          hazards:     row[13] || '',
+          access:      row[14] || '',
+          pruneType:   row[15] || '',
+          lotSize:     row[16] || '',
+          lotDensity:  row[17] || '',
+          endGoal:     row[18] || ''
+        };
+        out.customerEstimate = {
+          low:     row[19] || '',
+          typical: row[20] || '',
+          high:    row[21] || ''
+        };
+        out.notes = row[22] || '';
+        out.photoLinks = parsePhotoLinks(row[23]);
+        out.leadSource = 'estimate';
+        break;
+      }
+    }
+  }
+
+  // Fall back / overlay with All Leads (carries Address)
+  const summary = ss.getSheetByName(SHEETS.summary.name);
+  if (summary && summary.getLastRow() > 1) {
+    const rows = summary.getRange(2, 1, summary.getLastRow() - 1, 9).getValues();
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (rows[i][0] === estimateNumber) {
+        if (!out.contact.name)  out.contact.name  = rows[i][1] || '';
+        if (!out.contact.phone) out.contact.phone = rows[i][2] || '';
+        if (!out.contact.email) out.contact.email = rows[i][3] || '';
+        if (!out.contact.zip)   out.contact.zip   = rows[i][4] || '';
+        out.contact.address = rows[i][8] || '';
+        out.leadType = rows[i][5] || '';
+        out.jobType  = rows[i][6] || '';
+        if (!out.leadSource) out.leadSource = 'manual';
+        break;
+      }
+    }
+  }
+
+  // Overlay any existing Quote draft so the crew can resume.
+  out.quote = readLatestQuoteByEstimate(ss, estimateNumber);
+  return out;
+}
+
+function parsePhotoLinks(cell) {
+  if (!cell) return [];
+  return String(cell).split(/\s*[\n,]+\s*/).filter(Boolean);
+}
+
+function readLatestQuoteByEstimate(ss, estimateNumber) {
+  const sheet = ss.getSheetByName(SHEETS.quotes.name);
+  if (!sheet || sheet.getLastRow() < 2) return null;
+  const cols = SHEETS.quotes.headers.length;
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, cols).getValues();
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i][1] === estimateNumber) {
+      let trees = [];
+      try { trees = JSON.parse(rows[i][9] || '[]'); } catch (e) {}
+      return {
+        quoteNumber:  rows[i][0],
+        estimateNumber: rows[i][1],
+        status:       rows[i][2],
+        customer: {
+          name: rows[i][3], address: rows[i][4], phone: rows[i][5], email: rows[i][6], zip: rows[i][7]
+        },
+        service:     rows[i][8],
+        trees:       trees,
+        description: rows[i][10],
+        total:       rows[i][11],
+        customerEstimate: { low: rows[i][12], typical: rows[i][13], high: rows[i][14] },
+        createdAt:    rows[i][15],
+        sentAt:       rows[i][16],
+        completedAt:  rows[i][17],
+        invoicedAt:   rows[i][18],
+        createdBy:    rows[i][19],
+        notes:        rows[i][20]
+      };
+    }
+  }
+  return null;
+}
+
+/**
+ * Saves (or updates) a Quote row for a given Estimate #. Also
+ * backfills the Address into the All Leads summary so the master
+ * customer record stays in sync.
+ *
+ * Expected payload shape:
+ *   formType: 'crew_save_quote'
+ *   token: ...
+ *   quote: {
+ *     estimateNumber, customer: {name, address, phone, email, zip},
+ *     service, trees: [{species, count, size, speciesOther?}],
+ *     description, total,
+ *     customerEstimate: {low, typical, high},
+ *     notes
+ *   }
+ *   user: 'jason' | 'crew' | <email>
+ */
+function saveCrewQuote(ss, data) {
+  const q = data.quote || {};
+  if (!q.estimateNumber) return { error: 'missing estimateNumber' };
+
+  const sheet = getOrCreate(ss, SHEETS.quotes);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const existing = readLatestQuoteByEstimate(ss, q.estimateNumber);
+    const quoteNumber = (existing && existing.quoteNumber) || nextQuoteNumber();
+    const now = new Date();
+    const c = q.customer || {};
+    const ce = q.customerEstimate || {};
+    const row = [
+      quoteNumber,
+      q.estimateNumber,
+      'Draft',
+      c.name || '',
+      c.address || '',
+      c.phone || '',
+      c.email || '',
+      c.zip || '',
+      q.service || '',
+      JSON.stringify(q.trees || []),
+      q.description || '',
+      q.total || '',
+      ce.low || '',
+      ce.typical || '',
+      ce.high || '',
+      existing && existing.createdAt ? existing.createdAt : now,  // preserve original Created At
+      existing && existing.sentAt ? existing.sentAt : '',
+      existing && existing.completedAt ? existing.completedAt : '',
+      existing && existing.invoicedAt ? existing.invoicedAt : '',
+      data.user || existing && existing.createdBy || '',
+      q.notes || ''
+    ];
+
+    if (existing) {
+      // Find and update the existing row
+      const lastRow = sheet.getLastRow();
+      if (lastRow >= 2) {
+        const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+        for (let i = 0; i < ids.length; i++) {
+          if (ids[i][0] === existing.quoteNumber) {
+            sheet.getRange(i + 2, 1, 1, row.length).setValues([row]);
+            break;
+          }
+        }
+      }
+    } else {
+      sheet.appendRow(row);
+    }
+
+    // Backfill address into All Leads so the master record carries it.
+    backfillAddressOnSummary(ss, q.estimateNumber, c.address || '');
+
+    return { ok: true, quoteNumber: quoteNumber };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Quote numbers share the Estimate # year-monotonic pattern so they're
+ * easy to scan by date. Stored under quote_counter_<year>.
+ */
+function nextQuoteNumber() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const yyyy = String(new Date().getFullYear());
+    const key = 'quote_counter_' + yyyy;
+    const next = parseInt(props.getProperty(key) || '0', 10) + 1;
+    props.setProperty(key, String(next));
+    return 'Q' + yyyy + '_' + String(next).padStart(5, '0');
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Updates the Address column in All Leads for a given Estimate #.
+ * Only writes if the new address is non-empty AND differs from what's
+ * there — never blanks out an existing address.
+ */
+function backfillAddressOnSummary(ss, estimateNumber, address) {
+  if (!estimateNumber || !address) return;
+  const sheet = ss.getSheetByName(SHEETS.summary.name);
+  if (!sheet || sheet.getLastRow() < 2) return;
+  const ids = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] === estimateNumber) {
+      // Address column is index 9 (1-based) per SHEETS.summary.headers
+      sheet.getRange(i + 2, 9).setValue(address);
+      return;
+    }
+  }
+}
+
+/**
+ * Creates a manual lead — for phone-call leads that didn't come
+ * through the online estimate. Generates a fresh Estimate #, writes
+ * to All Leads as a "Lead", and returns the new ID so the crew tool
+ * can immediately open it for editing.
+ *
+ * Expected payload:
+ *   formType: 'crew_create_lead'
+ *   token: ...
+ *   contact: { name, phone, email, zip, address }
+ *   service: 'removal' | 'trimming' | 'lot_clearing' | ''
+ *   notes: string
+ */
+function createCrewLead(ss, data) {
+  const c = data.contact || {};
+  if (!c.name && !c.phone) return { error: 'name or phone required' };
+  const estimateNumber = nextEstimateNumber();
+  const summary = getOrCreate(ss, SHEETS.summary);
+  const jobType = SERVICE_NAMES[data.service] || data.service || '';
+  summary.appendRow([
+    estimateNumber,
+    c.name || '',
+    c.phone || '',
+    c.email || '',
+    c.zip || '',
+    'Lead',
+    jobType,
+    '',  // Estimate Range — empty for manual leads
+    c.address || ''
+  ]);
+  return { ok: true, estimateNumber: estimateNumber };
+}
+
 /**
  * Writes a wood signup row to the dedicated "Wood Signups" tab.
  * Mirrors the schedule/estimate writers for consistency.
@@ -1099,4 +1500,45 @@ function installTrigger() {
     .create();
   console.log('Trigger installed — pending lead emails are sent ' +
     EMAIL_DELAY_MINUTES + ' minutes after submission unless cancelled by a schedule.');
+}
+
+/**
+ * One-time setup for the /crew tool. Run once from the Apps Script
+ * editor (Run → installCrewToken). Generates a 40-char random token,
+ * stores it in ScriptProperties, and prints the URL Jason should save
+ * to his phone home screen. Re-running surfaces the existing token
+ * (does not rotate). Use rotateCrewToken() to force a new one.
+ */
+function installCrewToken() {
+  const props = PropertiesService.getScriptProperties();
+  const existing = props.getProperty('crew_access_token');
+  if (existing) {
+    console.log('Crew access token already set:');
+    console.log(existing);
+    console.log('Crew URL: https://pinepointtrees.com/crew?t=' + existing);
+    return existing;
+  }
+  const token = generateCrewToken_();
+  props.setProperty('crew_access_token', token);
+  console.log('Crew access token created. Save the URL — share with crew via:');
+  console.log('https://pinepointtrees.com/crew?t=' + token);
+  return token;
+}
+
+/**
+ * Rotate the crew token. Use if the URL leaks or someone leaves —
+ * everyone needs the new URL on their phone after this.
+ */
+function rotateCrewToken() {
+  const token = generateCrewToken_();
+  PropertiesService.getScriptProperties().setProperty('crew_access_token', token);
+  console.log('Crew access token rotated. New URL:');
+  console.log('https://pinepointtrees.com/crew?t=' + token);
+  return token;
+}
+
+function generateCrewToken_() {
+  const bytes = Utilities.getUuid().replace(/-/g, '') +
+                Utilities.getUuid().replace(/-/g, '');
+  return bytes.slice(0, 40);
 }

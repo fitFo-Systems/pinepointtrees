@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Crew · Pine Point Tree Service</title>
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="crew-page">
+
+  <header class="crew-header">
+    <div class="crew-header__brand">
+      <img src="images/logo-white.png" alt="Pine Point" class="crew-header__logo">
+      <span>Crew</span>
+    </div>
+    <a href="tel:+17742622145" class="crew-header__phone">(774) 262-2145</a>
+  </header>
+
+  <main class="crew-container">
+
+    <!-- Locked: no token in URL or stored locally -->
+    <section class="crew-view crew-view--locked" id="crew-locked">
+      <h1>Crew Access</h1>
+      <p>This tool is restricted. Open the link Pine Point sent you on your phone — that link includes the access token.</p>
+      <p style="color: var(--color-medium-gray); font-size: 0.875rem; margin-top: 24px;">If you lost the link, ask Jason to share it again. To rotate the token, run <code>rotateCrewToken</code> from the Apps Script editor.</p>
+    </section>
+
+    <!-- LIST: open leads / all leads -->
+    <section class="crew-view crew-view--list" id="crew-list" style="display:none;">
+      <div class="crew-list__top">
+        <h1>Leads</h1>
+        <button type="button" class="btn btn-primary" id="crew-new-lead-btn">+ New manual lead</button>
+      </div>
+
+      <div class="crew-filter-bar">
+        <button type="button" class="crew-filter-btn is-active" data-filter="open">Open</button>
+        <button type="button" class="crew-filter-btn" data-filter="all">Show all</button>
+        <input type="search" class="crew-search" id="crew-search" placeholder="Search name or phone">
+      </div>
+
+      <div class="crew-loading" id="crew-list-loading">Loading leads…</div>
+      <div class="crew-error" id="crew-list-error" style="display:none;"></div>
+      <div class="crew-list-rows" id="crew-list-rows"></div>
+      <div class="crew-empty" id="crew-list-empty" style="display:none;">No leads match this view.</div>
+    </section>
+
+    <!-- EDIT / CONFIRM -->
+    <section class="crew-view crew-view--edit" id="crew-edit" style="display:none;">
+      <button type="button" class="crew-back-btn" id="crew-back-btn">&larr; Back to leads</button>
+
+      <h1 id="crew-edit-title">Confirm details</h1>
+      <p class="crew-edit-meta" id="crew-edit-meta"></p>
+
+      <form id="crew-edit-form" autocomplete="off" onsubmit="return false">
+
+        <fieldset class="crew-fieldset">
+          <legend>Customer</legend>
+          <div class="crew-row">
+            <label>Name *<input type="text" id="crew-name" required></label>
+            <label>Phone *<input type="tel" id="crew-phone" required></label>
+          </div>
+          <div class="crew-row">
+            <label>Email<input type="email" id="crew-email"></label>
+            <label>ZIP<input type="text" id="crew-zip" inputmode="numeric" maxlength="10"></label>
+          </div>
+          <label>Street address *<input type="text" id="crew-address" placeholder="39 Prospect St, Auburn MA 01501" required></label>
+        </fieldset>
+
+        <fieldset class="crew-fieldset">
+          <legend>Job</legend>
+          <label>Service<select id="crew-service">
+            <option value="">— pick service —</option>
+            <option value="removal">Tree Removal</option>
+            <option value="trimming">Trimming &amp; Pruning</option>
+            <option value="lot_clearing">Lot Clearing</option>
+            <option value="other">Other</option>
+          </select></label>
+
+          <div class="crew-trees" id="crew-trees">
+            <div class="crew-trees__label">Trees worked on</div>
+            <div class="crew-trees__rows" id="crew-trees-rows"></div>
+            <button type="button" class="crew-trees__add" id="crew-trees-add">+ Add tree</button>
+          </div>
+
+          <label>Description (auto-drafted, edit as needed)
+            <textarea id="crew-description" rows="5"></textarea>
+          </label>
+
+          <div class="crew-row">
+            <label>Final total *<input type="number" id="crew-total" min="0" step="50" required placeholder="3000"></label>
+            <div class="crew-customer-est" id="crew-customer-est"></div>
+          </div>
+
+          <label>Internal notes (not on customer doc)
+            <input type="text" id="crew-notes" placeholder="Anything for your records">
+          </label>
+        </fieldset>
+
+        <div class="crew-actions">
+          <button type="button" class="btn btn-primary btn-lg" id="crew-save-btn">Save Quote</button>
+          <span class="crew-action-hint" id="crew-save-hint"></span>
+        </div>
+      </form>
+    </section>
+
+    <!-- SAVED -->
+    <section class="crew-view crew-view--saved" id="crew-saved" style="display:none;">
+      <h1>Quote saved</h1>
+      <p>Quote <strong id="crew-saved-num"></strong> saved to the Quotes tab.</p>
+      <p class="crew-saved-meta">Customer: <span id="crew-saved-customer"></span></p>
+      <div class="crew-actions">
+        <button type="button" class="btn btn-primary" id="crew-saved-back">Back to leads</button>
+        <button type="button" class="btn btn-outline" id="crew-saved-edit">Edit this quote</button>
+      </div>
+      <p style="color: var(--color-medium-gray); font-size: 0.875rem; margin-top: 24px;">PDF generation and email-to-customer are coming next. For now the quote lives in the Quotes tab in your Drive.</p>
+    </section>
+
+  </main>
+
+  <script src="js/crew.js"></script>
+</body>
+</html>
