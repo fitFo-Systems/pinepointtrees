@@ -631,10 +631,12 @@ h3 { font-size: var(--font-size-xl); }
   overflow: hidden;
 }
 
-.timeline-item img {
+.timeline-item img,
+.timeline-item video {
   width: 100%;
   height: 250px;
   object-fit: cover;
+  display: block;
 }
 
 .timeline-item__label {
@@ -1555,7 +1557,8 @@ body.emergency-active .hero {
   }
   .ba-slider { aspect-ratio: 3/4; }
   .timeline-item { flex: 0 0 220px; }
-  .timeline-item img { height: 170px; }
+  .timeline-item img,
+  .timeline-item video { height: 170px; }
 
   /* --- Stump spotlight: compact --- */
   .spotlight__image img { height: 320px; object-position: center 25%; }
