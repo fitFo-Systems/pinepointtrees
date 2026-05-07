@@ -56,7 +56,7 @@ const pricing = {
     base: { small: 1725, medium: 4025, large: 6900, xlarge: 11500 },
     access: { easy: 1.0, limited: 1.2, none: 1.5 },
     density: { brush: 0.7, mixed: 1.0, heavy: 1.4 },
-    endGoal: { build: 1.15, yard: 1.0, thin: 0.8 }
+    endGoal: { build: 1.15, yard: 1.0, thin: 0.8, as_is: 1.0 }
   }
 };
 
@@ -80,7 +80,7 @@ const labels = {
     lotSize: { small: 'small area', medium: 'medium lot', large: 'large lot', xlarge: '1+ acres' },
     lotDensity: { brush: 'brush/small trees', mixed: 'mixed', heavy: 'dense woods' },
     access: { easy: 'easy access', limited: 'limited access', none: 'difficult access' },
-    endGoal: { build: 'construction prep', yard: 'yard/lawn', thin: 'selective thinning' },
+    endGoal: { build: 'construction prep', yard: 'yard/lawn', thin: 'selective thinning', as_is: 'leave as is' },
     trunkWood: { yes: 'wood stays on property', no: 'wood hauled away' }
   }
 };
