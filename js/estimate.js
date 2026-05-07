@@ -42,8 +42,7 @@ const pricing = {
     base: { small: 300, medium: 700, large: 1400, xlarge: 2200 },
     access: { easy: 1.0, limited: 1.2, none: 1.45 },
     hazards: { none: 1.0, house: 1.15, powerlines: 1.3, both: 1.5 },
-    volume: { '1': 1.0, '2-3': 1.85, '4-6': 3.2, '7+': 5.0 },
-    stumpAddon: { small: 80, medium: 110, large: 140, xlarge: 180 }
+    volume: { '1': 1.0, '2-3': 1.85, '4-6': 3.2, '7+': 5.0 }
   },
   trimming: {
     base: { small: 150, medium: 500, large: 1400, xlarge: 2500 },
@@ -51,7 +50,6 @@ const pricing = {
     pruneType: { overhang: 1.15, shaping: 1.0, deadwood: 1.1, clearance: 1.25 },
     volume: { '1': 1.0, '2-3': 1.8, '4-6': 3.0, '7+': 4.5 }
   },
-  // stump standalone removed — stump addon pricing is in removal.stumpAddon
   lot_clearing: {
     base: { small: 1725, medium: 4025, large: 6900, xlarge: 11500 },
     access: { easy: 1.0, limited: 1.2, none: 1.5 },
@@ -67,7 +65,6 @@ const labels = {
     treeHeight: { small: 'small', medium: 'medium', large: 'large', xlarge: 'very large' },
     hazards: { none: 'open area', house: 'near structure', powerlines: 'near power lines', both: 'near house & lines' },
     access: { easy: 'easy access', limited: 'limited access', none: 'difficult access' },
-    stumpRemoval: { yes: 'stumps included', no: 'trees only', not_sure: '' },
     trunkWood: { yes: 'wood stays', no: 'smaller wood chipped' }
   },
   trimming: {
@@ -377,14 +374,6 @@ function calculateEstimate() {
       const hazardMult = p.hazards[a.hazards] || 1.0;
       const volumeMult = p.volume[a.treeCount] || 1.0;
       total = base * accessMult * hazardMult * volumeMult;
-
-      // Add stump grinding if requested
-      if (a.stumpRemoval === 'yes') {
-        const stumpBase = p.stumpAddon[a.treeHeight] || 110;
-        const stumpCount = parseFloat(a.treeCount) || 1;
-        const countNum = { '1': 1, '2-3': 2.5, '4-6': 5, '7+': 8 }[a.treeCount] || 1;
-        total += stumpBase * countNum * 0.85; // slight discount when bundled
-      }
       break;
     }
 
