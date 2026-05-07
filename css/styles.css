@@ -1494,6 +1494,43 @@ body.emergency-active .hero {
   margin-top: 56px; /* offset for fixed emergency banner */
 }
 
+/* --- Free wood banner --- */
+.wood-banner {
+  background: var(--color-green);
+  color: var(--color-white);
+  padding-top: 56px;
+  padding-bottom: 56px;
+}
+.wood-banner .section-label {
+  color: rgba(255, 255, 255, 0.85);
+}
+.wood-banner__inner {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 32px;
+  align-items: center;
+}
+.wood-banner__title {
+  color: var(--color-white);
+  margin: 8px 0 12px;
+}
+.wood-banner__text {
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 640px;
+  margin: 0;
+}
+.wood-banner__cta {
+  background: var(--color-white);
+  color: var(--color-green);
+  border-color: var(--color-white);
+  white-space: nowrap;
+}
+.wood-banner__cta:hover {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.92);
+  color: var(--color-green);
+}
+
 /* --- Responsive --- */
 @media (max-width: 1024px) {
   .services-grid { grid-template-columns: 1fr; }
@@ -1506,6 +1543,8 @@ body.emergency-active .hero {
   .footer__contact-info { grid-template-columns: 1fr; gap: 24px; }
   .ba-slider-container { grid-template-columns: 1fr; }
   .video-section-layout { grid-template-columns: 1fr; gap: 24px; }
+  .wood-banner__inner { grid-template-columns: 1fr; gap: 20px; text-align: left; }
+  .wood-banner__cta { width: 100%; }
   .gallery-grid { grid-template-columns: repeat(2, 1fr); }
 }
 

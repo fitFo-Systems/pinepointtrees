@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Free Wood Chips and Log Firewood | Pine Point Tree Service</title>
+  <meta name="description" content="Free wood chips and log-length firewood from Pine Point Tree Service in Leicester, MA. Sign up to get on the list.">
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/analytics.js"></script>
+</head>
+<body class="estimate-page">
+
+  <header class="estimate-header">
+    <a href="index.html" class="estimate-header__back" aria-label="Back to home">
+      <span class="estimate-header__back-arrow" aria-hidden="true">&larr;</span>
+      <img src="images/logo-white.png" alt="Pine Point Tree Service" class="estimate-header__back-logo">
+      <span class="estimate-header__back-text">Back to home</span>
+    </a>
+    <a href="tel:+17742622145" class="estimate-header__phone">(774) 262-2145</a>
+  </header>
+
+  <div class="estimate-container">
+
+    <div class="estimate-step active" data-step="wood-1">
+      <div class="estimate-step__number">Free Wood Products</div>
+      <h2 class="estimate-step__question">Free wood. Get on the list.</h2>
+      <p style="color: var(--color-light-gray); margin-bottom: 24px;">When we wrap a job we sometimes have wood chips or log-length firewood we'd rather drop off than haul to a transfer station. Sign up and we'll reach out when we have a load that fits.</p>
+
+      <form class="lead-form" id="woodForm" onsubmit="submitWood(event)">
+
+        <div class="form-group">
+          <label style="font-weight: 700; font-size: 1.05rem;">What are you interested in? *</label>
+          <div class="estimate-options" style="margin-top: 8px;">
+            <button type="button" class="estimate-option" data-key="productType" data-value="chips" onclick="onProductSelect(this)">
+              Wood chips <span class="estimate-option__desc">Mulch-style chips for landscaping or paths.</span>
+            </button>
+            <button type="button" class="estimate-option" data-key="productType" data-value="logs" onclick="onProductSelect(this)">
+              Log-length firewood <span class="estimate-option__desc">Cut to log length. You handle splitting and seasoning.</span>
+            </button>
+            <button type="button" class="estimate-option" data-key="productType" data-value="both" onclick="onProductSelect(this)">
+              Both <span class="estimate-option__desc">Get on the list for either.</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group" id="woodMixGroup" style="display: none;">
+          <label style="font-weight: 700; font-size: 1.05rem;">Wood preference *</label>
+          <p style="color: var(--color-medium-gray); font-size: 0.875rem; margin-top: 4px;">For log-length firewood only.</p>
+          <div class="estimate-options" style="margin-top: 8px;">
+            <button type="button" class="estimate-option" data-key="woodMix" data-value="mixed" onclick="onMixSelect(this)">
+              Hardwood and softwood mix <span class="estimate-option__desc">Whatever's on the truck. More volume, faster fill.</span>
+            </button>
+            <button type="button" class="estimate-option" data-key="woodMix" data-value="hardwood_only" onclick="onMixSelect(this)">
+              Hardwood only <span class="estimate-option__desc">Oak, maple, birch. May take longer to match a load.</span>
+            </button>
+          </div>
+        </div>
+
+        <h3 style="color: var(--color-white); margin: 16px 0 8px;">Your contact info</h3>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="wood-name">Name *</label>
+            <input type="text" id="wood-name" placeholder="Your name" required>
+          </div>
+          <div class="form-group">
+            <label for="wood-phone">Phone *</label>
+            <input type="tel" id="wood-phone" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="wood-zip">ZIP code *</label>
+            <input type="text" id="wood-zip" inputmode="numeric" pattern="\d{5}(-\d{4})?" maxlength="10" placeholder="01524" required>
+          </div>
+          <div class="form-group">
+            <label for="wood-email">Email <span style="color: var(--color-medium-gray); font-weight: 400;">(optional)</span></label>
+            <input type="email" id="wood-email" placeholder="you@email.com">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="wood-notes">Anything else we should know? <span style="color: var(--color-medium-gray); font-weight: 400;">(optional)</span></label>
+          <textarea id="wood-notes" rows="2" placeholder="Driveway access, quantity needed, etc." style="padding: 14px 16px; background: var(--color-charcoal); border: 2px solid var(--color-dark-gray); border-radius: 4px; color: var(--color-white); font-family: var(--font-family); font-size: 1rem; resize: vertical; width: 100%;"></textarea>
+        </div>
+        <div class="form-submit">
+          <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">Get me on the list</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="estimate-step" data-step="wood-confirm">
+      <div class="estimate-result">
+        <span class="section-label">All set</span>
+        <h2 class="estimate-step__question" style="margin-bottom: 8px;">You're on the list.</h2>
+        <p style="color: var(--color-light-gray); margin-bottom: 24px;">Pine Point will reach out when we have a load that fits. Free pickup or drop-off in the local area.</p>
+        <div style="display: grid; gap: 12px;">
+          <a href="tel:+17742622145" class="btn btn-outline btn-lg" style="width: 100%; justify-content: center;">
+            Call Now (774) 262-2145
+          </a>
+          <a href="index.html" class="btn btn-outline" style="width: 100%; justify-content: center;">
+            Back to homepage
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/wood-products.js"></script>
+</body>
+</html>
