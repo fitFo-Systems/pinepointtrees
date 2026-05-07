@@ -1428,10 +1428,11 @@ h3 { font-size: var(--font-size-xl); }
 }
 
 .video-caption__heading {
-  font-size: var(--font-size-xl);
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--color-white);
   margin-bottom: 12px;
+  white-space: nowrap;
 }
 
 /* --- Service Area Map --- */
