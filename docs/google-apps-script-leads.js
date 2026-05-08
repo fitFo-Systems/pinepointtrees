@@ -1714,6 +1714,18 @@ function handleCrewSendQuote(ss, data) {
   const existing = readLatestQuoteByEstimate(ss, data.estimateNumber);
   if (!existing) return { error: 'no quote saved for this lead yet' };
 
+  // Inline email override — when the crew tool prompts for an email
+  // that wasn't on file, patch it into the Quote row and the All Leads
+  // summary row, then carry it into the in-memory quote so the email
+  // routes correctly.
+  const overrideEmail = (data.overrideCustomerEmail || '').trim();
+  if (overrideEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(overrideEmail) &&
+      overrideEmail !== existing.customer.email) {
+    patchQuoteEmail_(ss, existing.quoteNumber, overrideEmail);
+    patchSummaryEmail_(ss, data.estimateNumber, overrideEmail);
+    existing.customer.email = overrideEmail;
+  }
+
   const asInvoice = !!data.asInvoice;
   const pdf = generateQuotePdf(existing, { asInvoice: asInvoice });
   let sendResult = null;
@@ -1754,6 +1766,41 @@ function handleCrewSendQuote(ss, data) {
     sentTo: sendResult ? sendResult.sentTo : '',
     sendError: sendResult && sendResult.error ? sendResult.error : ''
   };
+}
+
+/**
+ * Patches the Email column on a Quote row in place. Used when the
+ * crew tool prompts for an email that wasn't on file at save time.
+ * Email column = 7 (1-based) per SHEETS.quotes.headers.
+ */
+function patchQuoteEmail_(ss, quoteNumber, email) {
+  if (!quoteNumber || !email) return;
+  const sheet = ss.getSheetByName(SHEETS.quotes.name);
+  if (!sheet || sheet.getLastRow() < 2) return;
+  const ids = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] === quoteNumber) {
+      sheet.getRange(i + 2, 7).setValue(email);
+      return;
+    }
+  }
+}
+
+/**
+ * Same idea for the All Leads summary tab. Email column = 4 (1-based)
+ * per SHEETS.summary.headers.
+ */
+function patchSummaryEmail_(ss, estimateNumber, email) {
+  if (!estimateNumber || !email) return;
+  const sheet = ss.getSheetByName(SHEETS.summary.name);
+  if (!sheet || sheet.getLastRow() < 2) return;
+  const ids = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0] === estimateNumber) {
+      sheet.getRange(i + 2, 4).setValue(email);
+      return;
+    }
+  }
 }
 
 /**

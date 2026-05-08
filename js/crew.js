@@ -623,13 +623,15 @@ function saveQuote() {
       document.getElementById('crew-saved-num').textContent = state.savedQuote.quoteNumber || '(saved)';
       document.getElementById('crew-saved-customer').textContent = customer.name + ' · $' + total.toLocaleString('en-US');
       document.getElementById('crew-saved-title').textContent = 'Quote saved';
-      // PDF buttons start disabled until the user generates one (or sends).
+      // Buttons stay enabled — first click on View PDF generates if needed,
+      // first click on Send to customer with no email shows a clear error
+      // (a disabled button silently does nothing, which is worse UX).
       const viewBtn = document.getElementById('crew-saved-view-pdf');
-      viewBtn.disabled = true;
+      viewBtn.disabled = false;
       viewBtn.textContent = 'View PDF';
       const sendCustomerBtn = document.getElementById('crew-saved-send-customer');
-      sendCustomerBtn.disabled = !customer.email;
-      sendCustomerBtn.textContent = customer.email ? 'Send to customer' : 'Send to customer (need email)';
+      sendCustomerBtn.disabled = false;
+      sendCustomerBtn.textContent = customer.email ? 'Send to customer' : 'Send to customer';
       // Mark complete only when status is Sent or later
       document.getElementById('crew-saved-mark-complete').style.display = 'none';
       document.getElementById('crew-saved-hint').textContent = '';
@@ -676,25 +678,37 @@ function wireSavedView() {
   document.getElementById('crew-saved-view-pdf').addEventListener('click', async () => {
     const url = (state.savedQuote && state.savedQuote.pdfUrl) || '';
     if (url) {
-      window.open(url, '_blank');
+      openInNewTab(url);
       return;
     }
     // Generate-only call: no email, just produce the PDF.
     await sendQuoteAction({ mode: '' });
     if (state.savedQuote && state.savedQuote.pdfUrl) {
-      window.open(state.savedQuote.pdfUrl, '_blank');
+      openInNewTab(state.savedQuote.pdfUrl);
     }
   });
 
   document.getElementById('crew-saved-send-customer').addEventListener('click', async () => {
     const sq = state.savedQuote || {};
-    if (!sq.customerEmail) {
-      setSavedHint('Customer email is missing — go back, edit, and add one before sending.', 'error');
-      return;
+    let email = sq.customerEmail || '';
+    if (!email) {
+      const prompted = window.prompt(
+        "No email on file for " + (sq.customerName || 'this customer') + ".\n\n" +
+        "Enter their email address to send the quote:"
+      );
+      if (prompted === null) return;  // user cancelled the prompt
+      const trimmed = String(prompted).trim();
+      if (!trimmed) { setSavedHint('No email entered.', 'error'); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        setSavedHint("That email doesn't look right — check the @ and the domain.", 'error');
+        return;
+      }
+      email = trimmed;
+      state.savedQuote.customerEmail = email;  // remember locally so they don't have to re-enter
     }
-    const ok = window.confirm('Email this quote to ' + sq.customerName + ' at ' + sq.customerEmail + '?');
+    const ok = window.confirm('Email this quote to ' + sq.customerName + ' at ' + email + '?');
     if (!ok) return;
-    await sendQuoteAction({ mode: 'customer' });
+    await sendQuoteAction({ mode: 'customer', overrideEmail: email });
   });
 
   document.getElementById('crew-saved-send-self').addEventListener('click', async () => {
@@ -718,6 +732,24 @@ function setSavedHint(msg, kind) {
 }
 
 /**
+ * Opens a URL in a new tab via a programmatic anchor click. Browsers
+ * (esp. Safari) will silently block window.open() to a different
+ * origin even from a click handler if there's any async wait between
+ * the click and the call. A real anchor with target=_blank doesn't
+ * trigger popup blockers — Drive PDF URLs open reliably this way.
+ */
+function openInNewTab(url) {
+  if (!url) return;
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); }, 0);
+}
+
+/**
  * mode === 'customer' -> emails the customer + flips status to Sent
  * mode === 'preview'  -> emails the script owner only
  * mode === ''         -> just generates the PDF, no email (used by View PDF)
@@ -735,7 +767,8 @@ async function sendQuoteAction(opts) {
       token: state.token,
       estimateNumber: sq.estimateNumber,
       mode: opts.mode || '',
-      asInvoice: false
+      asInvoice: !!opts.asInvoice,
+      overrideCustomerEmail: opts.overrideEmail || ''
     });
     if (res.error) {
       setSavedHint('Failed: ' + res.error, 'error');
