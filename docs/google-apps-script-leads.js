@@ -1505,11 +1505,11 @@ function buildQuoteTemplateDoc_() {
 
   infoCell.clear();
   const companyTitle = infoCell.appendParagraph('Pine Point Tree Service LLC');
-  companyTitle.setBold(true).setFontSize(16).setForegroundColor('#1c1c1c');
+  companyTitle.setBold(true).setFontSize(16).setForegroundColor('#1C1C1C');
   const addr1 = infoCell.appendParagraph('710 Whittemore St   (774) 262-2145');
-  addr1.setFontSize(10).setForegroundColor('#444');
+  addr1.setFontSize(10).setForegroundColor('#444444');
   const addr2 = infoCell.appendParagraph('Leicester, MA 01524   pinepointtreeservice@gmail.com');
-  addr2.setFontSize(10).setForegroundColor('#444');
+  addr2.setFontSize(10).setForegroundColor('#444444');
 
   body.appendParagraph(' ').setFontSize(8);
 
@@ -1520,7 +1520,7 @@ function buildQuoteTemplateDoc_() {
   const numCell  = topTable.getCell(0, 1);
   custCell.clear();
   custCell.appendParagraph('{{customer_name}}').setBold(true).setFontSize(11);
-  custCell.appendParagraph('{{customer_address}}').setFontSize(11).setForegroundColor('#222');
+  custCell.appendParagraph('{{customer_address}}').setFontSize(11).setForegroundColor('#222222');
 
   numCell.clear();
   // Green badge with quote/invoice number
@@ -1575,7 +1575,7 @@ function buildQuoteTemplateDoc_() {
 
   // --- Optional customer note (replaced or stripped per-quote) ---
   const noteSep = body.appendParagraph('{{customer_note_block}}');
-  noteSep.setFontSize(10).setForegroundColor('#222').setItalic(true);
+  noteSep.setFontSize(10).setForegroundColor('#222222').setItalic(true);
 
   body.appendParagraph(' ').setFontSize(6);
 
@@ -1583,7 +1583,7 @@ function buildQuoteTemplateDoc_() {
   const authP = body.appendParagraph(
     'Authorization: By signing below, the customer authorizes the work described in this proposal to be performed. Payment is due upon completion of the work.'
   );
-  authP.setFontSize(10).setForegroundColor('#222').setBold(false);
+  authP.setFontSize(10).setForegroundColor('#222222').setBold(false);
 
   body.appendParagraph(' ').setFontSize(8);
 
