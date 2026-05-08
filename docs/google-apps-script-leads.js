@@ -1667,15 +1667,20 @@ function sendQuotePdfEmail(quote, pdfFileId, mode, options) {
   const subject = subjectPrefix + ' — ' + (isInvoice ? 'Invoice ' : 'Quote ') + (quote.quoteNumber || '');
 
   const cust = (quote.customer && quote.customer.name) || 'there';
-  const customerNoteHtml = quote.customerNote ? '<p style="margin:0 0 12px 0">' + escapeHtml(quote.customerNote) + '</p>' : '';
-  const greeting = isInvoice
-    ? 'Hi ' + escapeHtml(cust) + ',<br><br>Attached is the invoice for the work we completed. Thanks for choosing Pine Point.'
-    : 'Hi ' + escapeHtml(cust) + ',<br><br>Attached is the ' + docLabel + ' for the tree work we discussed. Let me know if anything looks off — otherwise sign and send back when you\'re ready.';
+  const greetingLine = 'Hi ' + escapeHtml(cust) + ',';
+  const bodyLine = isInvoice
+    ? 'Attached is the invoice for the work we completed. Thanks for choosing Pine Point.'
+    : 'Attached is the ' + docLabel + ' for the tree work we discussed. Let me know if anything looks off — otherwise sign and send back when you\'re ready.';
+  const customerNoteHtml = quote.customerNote
+    ? '<p style="margin:0 0 12px 0">' + escapeHtml(quote.customerNote) + '</p>'
+    : '';
 
+  // Order: greeting → optional personal note → standard body → sign-off
   const html = [
     '<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;color:#222">',
+    '<p style="margin:0 0 12px 0">' + greetingLine + '</p>',
     customerNoteHtml,
-    '<p style="margin:0 0 12px 0">' + greeting + '</p>',
+    '<p style="margin:0 0 12px 0">' + bodyLine + '</p>',
     '<p style="margin:0 0 4px 0">— Jason, Pine Point Tree Service</p>',
     '<p style="margin:0;color:#444">(774) 262-2145</p>',
     '</div>'
