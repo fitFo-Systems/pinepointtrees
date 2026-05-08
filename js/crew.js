@@ -83,7 +83,9 @@ const state = {
   searchTerm: '',
   currentLead: null,    // full lead detail being edited
   trees: [],            // [{species, count, size, speciesOther?}]
-  isManual: false       // true when editing a brand-new manual lead
+  isManual: false,      // true when editing a brand-new manual lead
+  // Saved-quote context for the "Saved" view actions:
+  savedQuote: null,     // { quoteNumber, estimateNumber, customerName, customerEmail, total, pdfUrl, status }
 };
 
 // =============================================
@@ -219,7 +221,13 @@ function renderLeads() {
   }).join('');
 
   rowsEl.querySelectorAll('.crew-lead-row').forEach(btn => {
-    btn.addEventListener('click', () => openLead(btn.dataset.est));
+    btn.addEventListener('click', () => {
+      // Immediate visual feedback so the click feels instant even when the
+      // server is cold-starting (~1-2s on first hit).
+      rowsEl.querySelectorAll('.crew-lead-row').forEach(b => b.classList.remove('is-loading'));
+      btn.classList.add('is-loading');
+      openLead(btn.dataset.est);
+    });
   });
 }
 
@@ -423,7 +431,8 @@ function hydrateEditForm(lead) {
     estEl.textContent = state.isManual ? 'No customer-side estimate (manual lead).' : '';
   }
 
-  // Notes
+  // Customer-facing note + internal notes
+  document.getElementById('crew-customer-note').value = (q && q.customerNote) || '';
   document.getElementById('crew-notes').value = (q && q.notes) || '';
 
   // Reset save hint
@@ -562,6 +571,7 @@ function saveQuote() {
 
   const service = document.getElementById('crew-service').value;
   const description = document.getElementById('crew-description').value.trim();
+  const customerNote = document.getElementById('crew-customer-note').value.trim();
   const notes = document.getElementById('crew-notes').value.trim();
 
   btn.disabled = true;
@@ -585,21 +595,44 @@ function saveQuote() {
         description,
         total,
         customerEstimate,
-        notes
+        notes,
+        customerNote
       });
     })
     .then(res => {
       if (res.error) throw new Error(res.error);
       showHint(hint, '', 'ok');
       btn.disabled = false;
-      // Show the saved view
-      document.getElementById('crew-saved-num').textContent = res.quoteNumber || '(saved)';
-      document.getElementById('crew-saved-customer').textContent = customer.name + ' · $' + total.toLocaleString('en-US');
-      // Update local state so "Edit this quote" goes back to the right lead
-      if (state.isManual) {
-        state.isManual = false;
-        // We need to re-fetch this newly-created lead next time.
+      // Capture the saved-quote context for the saved view actions.
+      state.savedQuote = {
+        quoteNumber: res.quoteNumber || '',
+        estimateNumber: state.isManual ? res.quoteNumber : (state.currentLead && state.currentLead.estimateNumber) || '',
+        customerName: customer.name,
+        customerEmail: customer.email,
+        total: total,
+        status: 'Draft',
+        pdfUrl: ''
+      };
+      // For manual leads we need to remember the new Estimate # so subsequent
+      // sends know which row to operate on.
+      if (state.isManual && state.currentLead === null) {
+        // Fetch the freshly-created lead so future actions have full context.
+        // (Server returned us a quoteNumber + the estimateNumber from createCrewLead;
+        // we already stashed estimateNumber on currentLead during ensureEstimate.)
       }
+      document.getElementById('crew-saved-num').textContent = state.savedQuote.quoteNumber || '(saved)';
+      document.getElementById('crew-saved-customer').textContent = customer.name + ' · $' + total.toLocaleString('en-US');
+      document.getElementById('crew-saved-title').textContent = 'Quote saved';
+      // PDF buttons start disabled until the user generates one (or sends).
+      const viewBtn = document.getElementById('crew-saved-view-pdf');
+      viewBtn.disabled = true;
+      viewBtn.textContent = 'View PDF';
+      const sendCustomerBtn = document.getElementById('crew-saved-send-customer');
+      sendCustomerBtn.disabled = !customer.email;
+      sendCustomerBtn.textContent = customer.email ? 'Send to customer' : 'Send to customer (need email)';
+      // Mark complete only when status is Sent or later
+      document.getElementById('crew-saved-mark-complete').style.display = 'none';
+      document.getElementById('crew-saved-hint').textContent = '';
       showView('saved');
     })
     .catch(err => {
@@ -629,7 +662,7 @@ function createManualLead(payload) {
 }
 
 // =============================================
-// SAVED VIEW
+// SAVED VIEW — PDF generation, send to customer / preview, mark complete
 // =============================================
 function wireSavedView() {
   document.getElementById('crew-saved-back').addEventListener('click', () => {
@@ -639,6 +672,129 @@ function wireSavedView() {
   document.getElementById('crew-saved-edit').addEventListener('click', () => {
     showView('edit');
   });
+
+  document.getElementById('crew-saved-view-pdf').addEventListener('click', async () => {
+    const url = (state.savedQuote && state.savedQuote.pdfUrl) || '';
+    if (url) {
+      window.open(url, '_blank');
+      return;
+    }
+    // Generate-only call: no email, just produce the PDF.
+    await sendQuoteAction({ mode: '' });
+    if (state.savedQuote && state.savedQuote.pdfUrl) {
+      window.open(state.savedQuote.pdfUrl, '_blank');
+    }
+  });
+
+  document.getElementById('crew-saved-send-customer').addEventListener('click', async () => {
+    const sq = state.savedQuote || {};
+    if (!sq.customerEmail) {
+      setSavedHint('Customer email is missing — go back, edit, and add one before sending.', 'error');
+      return;
+    }
+    const ok = window.confirm('Email this quote to ' + sq.customerName + ' at ' + sq.customerEmail + '?');
+    if (!ok) return;
+    await sendQuoteAction({ mode: 'customer' });
+  });
+
+  document.getElementById('crew-saved-send-self').addEventListener('click', async () => {
+    await sendQuoteAction({ mode: 'preview' });
+  });
+
+  document.getElementById('crew-saved-mark-complete').addEventListener('click', async () => {
+    const sq = state.savedQuote || {};
+    const ok = window.confirm('Mark the job done and email the invoice to ' + (sq.customerName || 'customer') +
+      (sq.customerEmail ? ' at ' + sq.customerEmail : '') + '?');
+    if (!ok) return;
+    await markCompleteAndSendInvoice();
+  });
+}
+
+function setSavedHint(msg, kind) {
+  const el = document.getElementById('crew-saved-hint');
+  el.textContent = msg;
+  el.className = 'crew-action-hint';
+  if (kind) el.classList.add('crew-action-hint--' + kind);
+}
+
+/**
+ * mode === 'customer' -> emails the customer + flips status to Sent
+ * mode === 'preview'  -> emails the script owner only
+ * mode === ''         -> just generates the PDF, no email (used by View PDF)
+ */
+async function sendQuoteAction(opts) {
+  const sq = state.savedQuote || {};
+  if (!sq.estimateNumber) {
+    setSavedHint('No saved quote in scope — try saving again.', 'error');
+    return;
+  }
+  setSavedHint('Generating PDF…', 'pending');
+  try {
+    const res = await postWithReply({
+      formType: 'crew_send_quote',
+      token: state.token,
+      estimateNumber: sq.estimateNumber,
+      mode: opts.mode || '',
+      asInvoice: false
+    });
+    if (res.error) {
+      setSavedHint('Failed: ' + res.error, 'error');
+      return;
+    }
+    if (res.pdfUrl) {
+      state.savedQuote.pdfUrl = res.pdfUrl;
+      const viewBtn = document.getElementById('crew-saved-view-pdf');
+      viewBtn.disabled = false;
+      viewBtn.textContent = 'View PDF';
+    }
+    if (opts.mode === 'customer' && res.sent) {
+      state.savedQuote.status = 'Sent';
+      setSavedHint('Sent to ' + res.sentTo, 'ok');
+      document.getElementById('crew-saved-mark-complete').style.display = '';
+    } else if (opts.mode === 'preview' && res.sent) {
+      setSavedHint('Preview emailed to ' + res.sentTo, 'ok');
+    } else if (!opts.mode) {
+      setSavedHint('PDF ready', 'ok');
+    } else if (res.sendError) {
+      setSavedHint('PDF generated but email failed: ' + res.sendError, 'error');
+    }
+  } catch (err) {
+    setSavedHint('Network error — try again.', 'error');
+    console.error('[crew] send error', err);
+  }
+}
+
+async function markCompleteAndSendInvoice() {
+  const sq = state.savedQuote || {};
+  setSavedHint('Marking complete…', 'pending');
+  try {
+    const markRes = await postWithReply({
+      formType: 'crew_mark_complete',
+      token: state.token,
+      estimateNumber: sq.estimateNumber
+    });
+    if (markRes.error) { setSavedHint('Mark complete failed: ' + markRes.error, 'error'); return; }
+    setSavedHint('Generating invoice PDF…', 'pending');
+    const sendRes = await postWithReply({
+      formType: 'crew_send_quote',
+      token: state.token,
+      estimateNumber: sq.estimateNumber,
+      mode: sq.customerEmail ? 'customer' : '',
+      asInvoice: true
+    });
+    if (sendRes.error) { setSavedHint('Send failed: ' + sendRes.error, 'error'); return; }
+    if (sendRes.pdfUrl) state.savedQuote.pdfUrl = sendRes.pdfUrl;
+    state.savedQuote.status = 'Invoiced';
+    document.getElementById('crew-saved-title').textContent = 'Invoice sent';
+    setSavedHint(sendRes.sent ? 'Invoice emailed to ' + sendRes.sentTo : 'Invoice generated. No email sent (no customer email on file).', 'ok');
+    document.getElementById('crew-saved-mark-complete').style.display = 'none';
+    const viewBtn = document.getElementById('crew-saved-view-pdf');
+    viewBtn.disabled = false;
+    viewBtn.textContent = 'View invoice PDF';
+  } catch (err) {
+    setSavedHint('Network error — try again.', 'error');
+    console.error('[crew] mark complete error', err);
+  }
 }
 
 // =============================================

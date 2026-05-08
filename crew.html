@@ -106,7 +106,11 @@
             <div class="crew-customer-est" id="crew-customer-est"></div>
           </div>
 
-          <label>Internal notes (not on customer doc)
+          <label>Note for the customer (appears on the quote / invoice)
+            <input type="text" id="crew-customer-note" placeholder='e.g. "Great to meet you today, thanks for your time."'>
+          </label>
+
+          <label>Internal notes (NOT on customer doc)
             <input type="text" id="crew-notes" placeholder="Anything for your records">
           </label>
         </section>
@@ -120,14 +124,24 @@
 
     <!-- SAVED -->
     <section class="crew-view crew-view--saved" id="crew-saved" style="display:none;">
-      <h1>Quote saved</h1>
+      <h1 id="crew-saved-title">Quote saved</h1>
       <p>Quote <strong id="crew-saved-num"></strong> saved to the Quotes tab.</p>
       <p class="crew-saved-meta">Customer: <span id="crew-saved-customer"></span></p>
-      <div class="crew-actions">
-        <button type="button" class="btn btn-primary" id="crew-saved-back">Back to leads</button>
+
+      <div class="crew-saved-actions">
+        <button type="button" class="btn btn-primary btn-lg" id="crew-saved-view-pdf" disabled>View PDF</button>
+        <button type="button" class="btn btn-outline" id="crew-saved-send-customer" disabled>Send to customer</button>
+        <button type="button" class="btn btn-outline" id="crew-saved-send-self">Send to me first</button>
+        <span class="crew-action-hint" id="crew-saved-hint"></span>
+      </div>
+
+      <div class="crew-saved-divider"></div>
+
+      <div class="crew-saved-actions">
+        <button type="button" class="btn btn-primary" id="crew-saved-mark-complete" style="display:none;">Mark complete and send invoice</button>
+        <button type="button" class="btn btn-outline" id="crew-saved-back">Back to leads</button>
         <button type="button" class="btn btn-outline" id="crew-saved-edit">Edit this quote</button>
       </div>
-      <p style="color: var(--color-medium-gray); font-size: 0.875rem; margin-top: 24px;">PDF generation and email-to-customer are coming next. For now the quote lives in the Quotes tab in your Drive.</p>
     </section>
 
   </main>
