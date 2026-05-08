@@ -1210,7 +1210,8 @@ function readLatestQuoteByEstimate(ss, estimateNumber) {
   const sheet = ss.getSheetByName(SHEETS.quotes.name);
   if (!sheet || sheet.getLastRow() < 2) return null;
   const cols = SHEETS.quotes.headers.length;
-  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, cols).getValues();
+  // Use display values so leading-zero ZIPs survive Sheet coercion.
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, cols).getDisplayValues();
   for (let i = rows.length - 1; i >= 0; i--) {
     if (rows[i][1] === estimateNumber) {
       let trees = [];
@@ -1220,7 +1221,7 @@ function readLatestQuoteByEstimate(ss, estimateNumber) {
         estimateNumber: rows[i][1],
         status:       rows[i][2],
         customer: {
-          name: rows[i][3], address: rows[i][4], phone: rows[i][5], email: rows[i][6], zip: rows[i][7]
+          name: rows[i][3], address: rows[i][4], phone: rows[i][5], email: rows[i][6], zip: normalizeZip(rows[i][7])
         },
         service:     rows[i][8],
         trees:       trees,
@@ -1269,6 +1270,11 @@ function saveCrewQuote(ss, data) {
     const now = new Date();
     const c = q.customer || {};
     const ce = q.customerEstimate || {};
+    // Pad short ZIPs and prefix with an apostrophe so Sheets stores
+    // them as text — without this the cell value "01524" gets coerced
+    // back to the number 1524 on write.
+    const zipNorm = normalizeZip(c.zip || '');
+    const zipForSheet = zipNorm ? "'" + zipNorm : '';
     const row = [
       quoteNumber,
       q.estimateNumber,
@@ -1277,7 +1283,7 @@ function saveCrewQuote(ss, data) {
       c.address || '',
       c.phone || '',
       c.email || '',
-      c.zip || '',
+      zipForSheet,
       q.service || '',
       JSON.stringify(q.trees || []),
       q.description || '',
@@ -1285,7 +1291,7 @@ function saveCrewQuote(ss, data) {
       ce.low || '',
       ce.typical || '',
       ce.high || '',
-      existing && existing.createdAt ? existing.createdAt : now,  // preserve original Created At
+      existing && existing.createdAt ? existing.createdAt : now,
       existing && existing.sentAt ? existing.sentAt : '',
       existing && existing.completedAt ? existing.completedAt : '',
       existing && existing.invoicedAt ? existing.invoicedAt : '',
@@ -1375,12 +1381,16 @@ function createCrewLead(ss, data) {
   const estimateNumber = nextEstimateNumber();
   const summary = getOrCreate(ss, SHEETS.summary);
   const jobType = SERVICE_NAMES[data.service] || data.service || '';
+  // Apostrophe-prefix the ZIP so Sheets stores it as text (preserves
+  // leading zeros). normalizeZip pads any short numeric ZIPs first.
+  const zipNorm = normalizeZip(c.zip || '');
+  const zipForSheet = zipNorm ? "'" + zipNorm : '';
   summary.appendRow([
     estimateNumber,
     c.name || '',
     c.phone || '',
     c.email || '',
-    c.zip || '',
+    zipForSheet,
     'Lead',
     jobType,
     '',  // Estimate Range — empty for manual leads

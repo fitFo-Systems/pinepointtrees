@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex,nofollow">
-  <title>Crew · Pine Point Tree Service</title>
+  <title>Invoicing · Pine Point Tree Service</title>
   <link rel="icon" type="image/x-icon" href="images/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,7 +16,7 @@
   <header class="crew-header">
     <div class="crew-header__brand">
       <img src="images/logo-white.png" alt="Pine Point" class="crew-header__logo">
-      <span>Crew</span>
+      <span>Invoicing</span>
     </div>
     <a href="tel:+17742622145" class="crew-header__phone">(774) 262-2145</a>
   </header>
@@ -25,7 +25,7 @@
 
     <!-- Locked: no token in URL or stored locally -->
     <section class="crew-view crew-view--locked" id="crew-locked">
-      <h1>Crew Access</h1>
+      <h1>Invoicing access</h1>
       <p>This tool is restricted. Open the link Pine Point sent you on your phone — that link includes the access token.</p>
       <p style="color: var(--color-medium-gray); font-size: 0.875rem; margin-top: 24px;">If you lost the link, ask Jason to share it again. To rotate the token, run <code>rotateCrewToken</code> from the Apps Script editor.</p>
     </section>
@@ -58,8 +58,8 @@
 
       <form id="crew-edit-form" autocomplete="off" onsubmit="return false">
 
-        <fieldset class="crew-fieldset">
-          <legend>Customer</legend>
+        <section class="crew-section">
+          <h2 class="crew-section__title">Customer</h2>
           <div class="crew-row">
             <label>Name *<input type="text" id="crew-name" required></label>
             <label>Phone *<input type="tel" id="crew-phone" required></label>
@@ -69,20 +69,20 @@
             <label>ZIP<input type="text" id="crew-zip" inputmode="numeric" maxlength="10"></label>
           </div>
           <label>Street address *<input type="text" id="crew-address" placeholder="39 Prospect St, Auburn MA 01501" required></label>
-        </fieldset>
+        </section>
 
-        <fieldset class="crew-fieldset crew-fieldset--readonly" id="crew-customer-said" style="display:none;">
-          <legend>What the customer said</legend>
+        <section class="crew-section crew-section--readonly" id="crew-customer-said" style="display:none;">
+          <h2 class="crew-section__title">What the customer said</h2>
           <p class="crew-readonly-hint">For your reference. Not shown on the customer's quote or invoice.</p>
           <div class="crew-readonly-rows" id="crew-customer-said-rows"></div>
           <div class="crew-readonly-notes" id="crew-customer-said-notes" style="display:none;">
             <div class="crew-readonly-notes__label">Their note</div>
             <div class="crew-readonly-notes__body" id="crew-customer-said-notes-body"></div>
           </div>
-        </fieldset>
+        </section>
 
-        <fieldset class="crew-fieldset">
-          <legend>Job</legend>
+        <section class="crew-section">
+          <h2 class="crew-section__title">Job</h2>
           <label>Service<select id="crew-service">
             <option value="">— pick service —</option>
             <option value="removal">Tree Removal</option>
@@ -109,7 +109,7 @@
           <label>Internal notes (not on customer doc)
             <input type="text" id="crew-notes" placeholder="Anything for your records">
           </label>
-        </fieldset>
+        </section>
 
         <div class="crew-actions">
           <button type="button" class="btn btn-primary btn-lg" id="crew-save-btn">Save Quote</button>

@@ -1572,29 +1572,31 @@ body.emergency-active .hero {
 }
 .crew-edit-meta { color: var(--color-medium-gray); font-size: 0.85rem; margin: -4px 0 16px; }
 
-.crew-fieldset {
+.crew-section {
   border: 1px solid var(--color-dark-gray); border-radius: 6px;
   padding: 16px; margin: 0 0 16px; background: #1a1a1a;
 }
-.crew-fieldset legend {
-  padding: 0 8px; color: var(--color-white); font-weight: 700; font-size: 0.85rem;
+.crew-section__title {
+  margin: 0 0 14px; padding: 0 0 10px;
+  border-bottom: 1px solid var(--color-dark-gray);
+  color: var(--color-white); font-weight: 700; font-size: 0.85rem;
   text-transform: uppercase; letter-spacing: 0.05em;
 }
-.crew-fieldset label {
+.crew-section label {
   display: block; font-size: 0.875rem; color: var(--color-light-gray); margin-bottom: 12px;
 }
-.crew-fieldset input[type="text"],
-.crew-fieldset input[type="tel"],
-.crew-fieldset input[type="email"],
-.crew-fieldset input[type="number"],
-.crew-fieldset select,
-.crew-fieldset textarea {
+.crew-section input[type="text"],
+.crew-section input[type="tel"],
+.crew-section input[type="email"],
+.crew-section input[type="number"],
+.crew-section select,
+.crew-section textarea {
   display: block; width: 100%; margin-top: 4px;
   padding: 10px 12px; border-radius: 4px; border: 1px solid var(--color-dark-gray);
   background: var(--color-charcoal); color: var(--color-white);
   font-family: var(--font-family); font-size: 1rem;
 }
-.crew-fieldset textarea { resize: vertical; min-height: 100px; }
+.crew-section textarea { resize: vertical; min-height: 100px; }
 .crew-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .crew-row > label { margin-bottom: 12px; }
 
@@ -1635,8 +1637,8 @@ body.emergency-active .hero {
 .crew-customer-est__label { display: block; color: var(--color-light-gray); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
 
 /* Read-only "What the customer said" panel */
-.crew-fieldset--readonly { background: #161616; border-color: #2a2a2a; }
-.crew-fieldset--readonly legend { color: var(--color-light-gray); }
+.crew-section--readonly { background: #161616; border-color: var(--color-dark-gray); }
+.crew-section--readonly .crew-section__title { color: var(--color-light-gray); border-bottom-color: #232323; }
 .crew-readonly-hint { color: var(--color-medium-gray); font-size: 0.8rem; margin: -4px 0 12px; font-style: italic; }
 .crew-readonly-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
 .crew-readonly-row { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-bottom: 1px solid #232323; }
