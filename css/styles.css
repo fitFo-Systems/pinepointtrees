@@ -1571,6 +1571,9 @@ body.emergency-active .hero {
 .crew-pill--sent      { background: rgba(45,90,39,0.3); color: #7ec97a; }
 .crew-pill--job-done  { background: rgba(45,90,39,0.5); color: #a4dba1; }
 .crew-pill--invoiced  { background: rgba(45,90,39,0.7); color: #b9e6b6; }
+.crew-pill--source-estimate { background: rgba(140,160,255,0.18); color: #b8c5ff; }
+.crew-pill--source-manual   { background: rgba(220,160,80,0.18);  color: #f0c386; }
+.crew-lead-row__pills { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 
 .crew-loading, .crew-empty, .crew-error { padding: 16px; color: var(--color-medium-gray); text-align: center; }
 .crew-error { color: #ff8888; }

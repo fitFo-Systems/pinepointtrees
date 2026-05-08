@@ -206,6 +206,9 @@ function renderLeads() {
   rowsEl.innerHTML = matched.map(lead => {
     const status = lead.status || 'New';
     const statusClass = 'crew-pill crew-pill--' + status.toLowerCase().replace(/\s+/g, '-');
+    const source = lead.source === 'manual' ? 'manual' : 'estimate';
+    const sourceLabel = source === 'manual' ? 'Manual' : 'Online';
+    const sourceClass = 'crew-pill crew-pill--source-' + source;
     return `
       <button type="button" class="crew-lead-row" data-est="${escapeAttr(lead.estimateNumber)}">
         <div class="crew-lead-row__main">
@@ -213,7 +216,10 @@ function renderLeads() {
           <div class="crew-lead-row__sub">${escapeText(lead.phone || '')} · ${escapeText(lead.jobType || lead.leadType || '—')}</div>
         </div>
         <div class="crew-lead-row__right">
-          <span class="${statusClass}">${escapeText(status)}</span>
+          <div class="crew-lead-row__pills">
+            <span class="${sourceClass}">${sourceLabel}</span>
+            <span class="${statusClass}">${escapeText(status)}</span>
+          </div>
           <span class="crew-lead-row__est">${escapeText(lead.estimateNumber || '')}</span>
         </div>
       </button>

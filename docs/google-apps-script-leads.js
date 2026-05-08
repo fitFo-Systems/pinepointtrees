@@ -1085,6 +1085,10 @@ function listCrewLeads(ss, filter) {
 
   // Pull the Quotes tab to know which leads already have a Quote/Invoice in motion
   const quoteStatusByEst = readQuoteStatusByEstimate(ss);
+  // Pull the Estimate Leads tab so we can mark each summary row as
+  // "from online estimate" vs "manual entry" — the crew tool wants
+  // to see this at a glance.
+  const estimateLeadIds = readEstimateLeadIds_(ss);
 
   const out = [];
   for (let i = rows.length - 1; i >= 0; i--) {  // newest first (rows are appended)
@@ -1102,8 +1106,25 @@ function listCrewLeads(ss, filter) {
       jobType: r[6] || '',
       estimateRange: r[7] || '',
       address: r[8] || '',
-      status: status
+      status: status,
+      source: estimateLeadIds[r[0]] ? 'estimate' : 'manual'
     });
+  }
+  return out;
+}
+
+/**
+ * Returns a map { estimateNumber: true } of every row in the Estimate
+ * Leads tab. Used by listCrewLeads to label each summary row as
+ * online-estimate vs manual without re-scanning the tab per row.
+ */
+function readEstimateLeadIds_(ss) {
+  const sheet = ss.getSheetByName(SHEETS.estimate_contact.name);
+  if (!sheet || sheet.getLastRow() < 2) return {};
+  const ids = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues();
+  const out = {};
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i][0]) out[ids[i][0]] = true;
   }
   return out;
 }
