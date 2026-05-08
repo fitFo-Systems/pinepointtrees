@@ -636,6 +636,11 @@ function saveQuote() {
       document.getElementById('crew-saved-mark-complete').style.display = 'none';
       document.getElementById('crew-saved-hint').textContent = '';
       showView('saved');
+      // Eagerly generate the PDF in the background so by the time the
+      // crew taps View PDF the URL is already set and the open call
+      // happens synchronously inside the user-gesture window (no popup
+      // blocker headaches).
+      sendQuoteAction({ mode: '', silentSuccess: true });
     })
     .catch(err => {
       btn.disabled = false;
@@ -678,13 +683,23 @@ function wireSavedView() {
   document.getElementById('crew-saved-view-pdf').addEventListener('click', async () => {
     const url = (state.savedQuote && state.savedQuote.pdfUrl) || '';
     if (url) {
+      // Synchronous click path — no async wait, no popup blocker.
       openInNewTab(url);
       return;
     }
-    // Generate-only call: no email, just produce the PDF.
+    // No URL yet (eager generation either hasn't finished or hasn't started).
+    // Open about:blank synchronously inside this click event so we keep the
+    // user-gesture context, then redirect that tab to the PDF when it's ready.
+    const placeholderTab = window.open('about:blank', '_blank');
     await sendQuoteAction({ mode: '' });
-    if (state.savedQuote && state.savedQuote.pdfUrl) {
-      openInNewTab(state.savedQuote.pdfUrl);
+    const finalUrl = state.savedQuote && state.savedQuote.pdfUrl;
+    if (placeholderTab && !placeholderTab.closed && finalUrl) {
+      placeholderTab.location.href = finalUrl;
+    } else if (finalUrl) {
+      // Placeholder tab was blocked or closed — fall back to anchor click.
+      openInNewTab(finalUrl);
+    } else if (placeholderTab && !placeholderTab.closed) {
+      placeholderTab.close();
     }
   });
 
@@ -755,12 +770,13 @@ function openInNewTab(url) {
  * mode === ''         -> just generates the PDF, no email (used by View PDF)
  */
 async function sendQuoteAction(opts) {
+  opts = opts || {};
   const sq = state.savedQuote || {};
   if (!sq.estimateNumber) {
-    setSavedHint('No saved quote in scope — try saving again.', 'error');
+    if (!opts.silentSuccess) setSavedHint('No saved quote in scope — try saving again.', 'error');
     return;
   }
-  setSavedHint('Generating PDF…', 'pending');
+  if (!opts.silentSuccess) setSavedHint('Generating PDF…', 'pending');
   try {
     const res = await postWithReply({
       formType: 'crew_send_quote',
@@ -771,7 +787,7 @@ async function sendQuoteAction(opts) {
       overrideCustomerEmail: opts.overrideEmail || ''
     });
     if (res.error) {
-      setSavedHint('Failed: ' + res.error, 'error');
+      if (!opts.silentSuccess) setSavedHint('Failed: ' + res.error, 'error');
       return;
     }
     if (res.pdfUrl) {
@@ -786,13 +802,18 @@ async function sendQuoteAction(opts) {
       document.getElementById('crew-saved-mark-complete').style.display = '';
     } else if (opts.mode === 'preview' && res.sent) {
       setSavedHint('Preview emailed to ' + res.sentTo, 'ok');
-    } else if (!opts.mode) {
+    } else if (!opts.mode && !opts.silentSuccess) {
       setSavedHint('PDF ready', 'ok');
     } else if (res.sendError) {
       setSavedHint('PDF generated but email failed: ' + res.sendError, 'error');
+    } else if (!opts.mode && opts.silentSuccess) {
+      // Eager-generation success — quietly mark "PDF ready" without
+      // overwriting any user-facing hint.
+      const hintEl = document.getElementById('crew-saved-hint');
+      if (hintEl && !hintEl.textContent) setSavedHint('PDF ready', 'ok');
     }
   } catch (err) {
-    setSavedHint('Network error — try again.', 'error');
+    if (!opts.silentSuccess) setSavedHint('Network error — try again.', 'error');
     console.error('[crew] send error', err);
   }
 }
