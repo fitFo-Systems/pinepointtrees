@@ -382,7 +382,7 @@ h3 { font-size: var(--font-size-xl); }
 /* --- Services Grid --- */
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 2px;
 }
 
@@ -396,6 +396,20 @@ h3 { font-size: var(--font-size-xl); }
 
 .service-card:hover {
   background: var(--color-dark-gray);
+}
+
+/* Free Wood card — clickable, links to the sign-up page */
+.service-card--link {
+  display: block;
+  text-decoration: none;
+}
+
+.service-card__cta {
+  display: inline-block;
+  margin-top: 16px;
+  color: var(--color-green);
+  font-weight: 700;
+  font-size: var(--font-size-base);
 }
 
 .service-card__title {

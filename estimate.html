@@ -426,6 +426,10 @@
           <input type="email" id="sched-email" placeholder="you@email.com">
         </div>
         <div class="form-group" style="margin-bottom:0">
+          <label for="sched-address">Property address *</label>
+          <input type="text" id="sched-address" placeholder="Where the work would happen" autocomplete="street-address" required>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
           <label>How should we reach you? *</label>
           <div class="sched-method-group">
             <button type="button" class="sched-method-btn" data-method="email" onclick="onSchedMethodSelect('email')">Email</button>

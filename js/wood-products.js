@@ -123,17 +123,24 @@ function submitWood(e) {
     return;
   }
 
-  const nameInput  = document.getElementById('wood-name');
-  const phoneInput = document.getElementById('wood-phone');
-  const emailInput = document.getElementById('wood-email');
-  const zipInput   = document.getElementById('wood-zip');
-  const notesInput = document.getElementById('wood-notes');
+  const nameInput    = document.getElementById('wood-name');
+  const phoneInput   = document.getElementById('wood-phone');
+  const addressInput = document.getElementById('wood-address');
+  const emailInput   = document.getElementById('wood-email');
+  const zipInput     = document.getElementById('wood-zip');
+  const notesInput   = document.getElementById('wood-notes');
 
   if (!isValidPhone(phoneInput.value)) {
     showFieldError(phoneInput, 'Enter a 10-digit phone number we can text or call.');
     return;
   }
   clearFieldError(phoneInput);
+
+  if (!addressInput.value.trim()) {
+    showFieldError(addressInput, 'Enter the address where we could drop off a load.');
+    return;
+  }
+  clearFieldError(addressInput);
 
   if (!isValidEmail(emailInput.value)) {
     showFieldError(emailInput, "That email doesn't look right. Double-check the @ and the domain, or leave it blank.");
@@ -152,10 +159,11 @@ function submitWood(e) {
     productType: woodState.productType,
     woodMix:     woodState.woodMix,
     contact: {
-      name:  nameInput.value,
-      phone: phoneInput.value,
-      email: emailInput.value,
-      zip:   zipInput.value.trim(),
+      name:    nameInput.value,
+      phone:   phoneInput.value,
+      address: addressInput.value.trim(),
+      email:   emailInput.value,
+      zip:     zipInput.value.trim(),
     },
     notes: notesInput.value,
     page:  location.href,

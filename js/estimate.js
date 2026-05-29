@@ -459,6 +459,7 @@ function openScheduleModal() {
   if (form) delete form.dataset.contactMethod;
   document.getElementById('sched-time-row').style.display = 'none';
   document.getElementById('sched-time').value = '';
+  clearFieldError(document.getElementById('sched-address'));
   document.getElementById('sched-submit-btn').textContent = 'Schedule a Follow-Up';
   document.getElementById('sched-email').required = false;
   const optTag = document.getElementById('sched-email-optional');
@@ -602,6 +603,7 @@ function submitSchedule(e) {
   const contactMethod = form.dataset.contactMethod || '';
   const phoneInput    = document.getElementById('sched-phone');
   const emailInput    = document.getElementById('sched-email');
+  const addressInput  = document.getElementById('sched-address');
 
   // Contact method required
   if (!contactMethod) {
@@ -638,6 +640,13 @@ function submitSchedule(e) {
   }
   clearFieldError(emailInput);
 
+  // Property address required — the follow-up is an on-site visit
+  if (!addressInput.value.trim()) {
+    showFieldError(addressInput, 'Enter the property address where the work would happen.');
+    return;
+  }
+  clearFieldError(addressInput);
+
   // Time required for phone call
   if (contactMethod === 'phone_call') {
     const timeSelect = document.getElementById('sched-time');
@@ -651,6 +660,7 @@ function submitSchedule(e) {
     name:          document.getElementById('sched-name').value,
     phone:         phoneInput.value,
     email:         emailInput.value,
+    address:       addressInput.value.trim(),
     time:          document.getElementById('sched-time').value,
     notes:         document.getElementById('sched-notes').value,
     contactMethod,
@@ -662,10 +672,11 @@ function submitSchedule(e) {
     answers:  state.answers,
     price:    state.price || calculateEstimate(),
     contact: {
-      name:  sched.name,
-      phone: sched.phone,
-      email: sched.email,
-      zip:   (state.contact && state.contact.zip) || '',
+      name:    sched.name,
+      phone:   sched.phone,
+      email:   sched.email,
+      address: sched.address,
+      zip:     (state.contact && state.contact.zip) || '',
     },
     contactMethod:  sched.contactMethod,
     scheduledTime:  sched.time,
